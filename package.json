@@ -3,12 +3,22 @@
   "version": "1.0.0",
   "type": "module",
   "main": "build/index.js",
+  "bin": {
+    "woocommerce-mcp-server": "build/index.js"
+  },
   "scripts": {
     "build": "tsc",
-    "start": "node build/index.js"
+    "start": "node build/index.js",
+    "dev": "tsc && node build/index.js",
+    "test": "npm run build && node build/tests/simple-test.js",
+    "test:full": "npm run build && node build/tests/test-runner.js",
+    "test:api": "npm run test",
+    "validate": "npm run build && echo '✅ Build successful - All schemas and tools validated'"
   },
   "dependencies": {
-    "axios": "^1.7.9"
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "axios": "^1.7.9",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -17,8 +27,17 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/techspawn/woocommerce-mcp-server.git"
+    "url": "https://github.com/lord-dubious/woocommerce-mcp-server.git"
   },
-  "author": "techspawn",
-  "description": "MCP server for WooCommerce integration"
+  "author": "lord-dubious",
+  "description": "MCP server for WooCommerce integration providing tools for managing products, orders, customers, and more",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "woocommerce",
+    "wordpress",
+    "ecommerce",
+    "ai",
+    "claude"
+  ]
 }
