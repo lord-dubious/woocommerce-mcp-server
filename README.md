@@ -178,6 +178,10 @@ WOOCOMMERCE_CONSUMER_SECRET=cs_your_consumer_secret
 # Optional for WordPress API (if needed)
 WORDPRESS_USERNAME=your_username
 WORDPRESS_PASSWORD=your_password
+
+# Optional: Enable verbose logging (shows all 91 tools on startup)
+# Set to "true" for development, leave unset for MCP clients
+WOOCOMMERCE_MCP_VERBOSE=true
 ```
 
 ### Getting WooCommerce API Keys

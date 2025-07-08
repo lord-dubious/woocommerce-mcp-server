@@ -4205,73 +4205,82 @@ async function main() {
     // Connect the server to the transport
     await server.connect(transport);
 
-    // Log that the server is running (to stderr so it doesn't interfere with stdio)
-    console.error("WooCommerce MCP Server is running...");
-    console.error("Available tools:");
-    console.error("");
-    console.error("📦 Product Management (6 tools):");
-    console.error("- get_products, get_product, create_product, update_product, delete_product");
-    console.error("");
-    console.error("📋 Order Management (5 tools):");
-    console.error("- get_orders, get_order, create_order, update_order, delete_order");
-    console.error("");
-    console.error("👥 Customer Management (5 tools):");
-    console.error("- get_customers, get_customer, create_customer, update_customer, delete_customer");
-    console.error("");
-    console.error("🏷️ Categories & Tags (10 tools):");
-    console.error("- get_product_categories, get_product_category, create_product_category, update_product_category, delete_product_category");
-    console.error("- get_product_tags, get_product_tag, create_product_tag, update_product_tag, delete_product_tag");
-    console.error("");
-    console.error("🎫 Coupons (5 tools):");
-    console.error("- get_coupons, get_coupon, create_coupon, update_coupon, delete_coupon");
-    console.error("");
-    console.error("🔧 Product Attributes (5 tools):");
-    console.error("- get_product_attributes, get_product_attribute, create_product_attribute, update_product_attribute, delete_product_attribute");
-    console.error("");
-    console.error("🔄 Product Variations (5 tools):");
-    console.error("- get_product_variations, get_product_variation, create_product_variation, update_product_variation, delete_product_variation");
-    console.error("");
-    console.error("📝 Order Notes (4 tools):");
-    console.error("- get_order_notes, get_order_note, create_order_note, delete_order_note");
-    console.error("");
-    console.error("💰 Order Refunds (4 tools):");
-    console.error("- get_order_refunds, get_order_refund, create_order_refund, delete_order_refund");
-    console.error("");
-    console.error("🔗 Meta Data Operations (12 tools):");
-    console.error("- get_product_meta, create_product_meta, update_product_meta, delete_product_meta");
-    console.error("- get_order_meta, create_order_meta, update_order_meta, delete_order_meta");
-    console.error("- get_customer_meta, create_customer_meta, update_customer_meta, delete_customer_meta");
-    console.error("");
-    console.error("⭐ Product Reviews (5 tools):");
-    console.error("- get_product_reviews, get_product_review, create_product_review, update_product_review, delete_product_review");
-    console.error("");
-    console.error("⚙️ Settings Management (3 tools):");
-    console.error("- get_settings, get_setting_options, update_setting_option");
-    console.error("");
-    console.error("📊 Reports & Analytics (8 tools):");
-    console.error("- get_sales_report, get_products_report, get_orders_report, get_customers_report");
-    console.error("- get_categories_report, get_stock_report, get_coupons_report, get_taxes_report");
-    console.error("");
-    console.error("🌍 Data & Geography (5 tools):");
-    console.error("- get_data, get_continents, get_countries, get_currencies, get_current_currency");
-    console.error("");
-    console.error("📄 WordPress Posts (4 tools):");
-    console.error("- create_post, get_posts, update_post, get_post_meta");
-    console.error("");
-    console.error("💳 Payment Gateways (3 tools):");
-    console.error("- get_payment_gateways, get_payment_gateway, update_payment_gateway");
-    console.error("");
-    console.error("⚙️ System (3 tools):");
-    console.error("- get_system_status, get_system_status_tools, run_system_status_tool");
-    console.error("");
-    console.error("🎯 TOTAL: 91 COMPREHENSIVE WOOCOMMERCE TOOLS");
-    console.error("");
-    console.error("Environment variables:");
-    console.error("- WORDPRESS_SITE_URL: Your WordPress site URL");
-    console.error("- WOOCOMMERCE_CONSUMER_KEY: WooCommerce API consumer key");
-    console.error("- WOOCOMMERCE_CONSUMER_SECRET: WooCommerce API consumer secret");
-    console.error("- WORDPRESS_USERNAME: WordPress username (for WordPress API)");
-    console.error("- WORDPRESS_PASSWORD: WordPress password (for WordPress API)");
+    // Check if we're in a verbose logging environment
+    const isVerbose = process.env.WOOCOMMERCE_MCP_VERBOSE === "true" || process.argv.includes("--verbose");
+
+    if (isVerbose) {
+      // Detailed logging for development/debugging
+      console.log("🚀 WooCommerce MCP Server is running...");
+      console.log("📋 Available tools:");
+    } else {
+      // Minimal logging for MCP clients
+      console.log("WooCommerce MCP Server ready - 91 tools available");
+      return; // Skip detailed tool listing
+    }
+    console.log("");
+    console.log("📦 Product Management (6 tools):");
+    console.log("- get_products, get_product, create_product, update_product, delete_product");
+    console.log("");
+    console.log("📋 Order Management (5 tools):");
+    console.log("- get_orders, get_order, create_order, update_order, delete_order");
+    console.log("");
+    console.log("👥 Customer Management (5 tools):");
+    console.log("- get_customers, get_customer, create_customer, update_customer, delete_customer");
+    console.log("");
+    console.log("🏷️ Categories & Tags (10 tools):");
+    console.log("- get_product_categories, get_product_category, create_product_category, update_product_category, delete_product_category");
+    console.log("- get_product_tags, get_product_tag, create_product_tag, update_product_tag, delete_product_tag");
+    console.log("");
+    console.log("🎫 Coupons (5 tools):");
+    console.log("- get_coupons, get_coupon, create_coupon, update_coupon, delete_coupon");
+    console.log("");
+    console.log("🔧 Product Attributes (5 tools):");
+    console.log("- get_product_attributes, get_product_attribute, create_product_attribute, update_product_attribute, delete_product_attribute");
+    console.log("");
+    console.log("🔄 Product Variations (5 tools):");
+    console.log("- get_product_variations, get_product_variation, create_product_variation, update_product_variation, delete_product_variation");
+    console.log("");
+    console.log("📝 Order Notes (4 tools):");
+    console.log("- get_order_notes, get_order_note, create_order_note, delete_order_note");
+    console.log("");
+    console.log("💰 Order Refunds (4 tools):");
+    console.log("- get_order_refunds, get_order_refund, create_order_refund, delete_order_refund");
+    console.log("");
+    console.log("🔗 Meta Data Operations (12 tools):");
+    console.log("- get_product_meta, create_product_meta, update_product_meta, delete_product_meta");
+    console.log("- get_order_meta, create_order_meta, update_order_meta, delete_order_meta");
+    console.log("- get_customer_meta, create_customer_meta, update_customer_meta, delete_customer_meta");
+    console.log("");
+    console.log("⭐ Product Reviews (5 tools):");
+    console.log("- get_product_reviews, get_product_review, create_product_review, update_product_review, delete_product_review");
+    console.log("");
+    console.log("⚙️ Settings Management (3 tools):");
+    console.log("- get_settings, get_setting_options, update_setting_option");
+    console.log("");
+    console.log("📊 Reports & Analytics (8 tools):");
+    console.log("- get_sales_report, get_products_report, get_orders_report, get_customers_report");
+    console.log("- get_categories_report, get_stock_report, get_coupons_report, get_taxes_report");
+    console.log("");
+    console.log("🌍 Data & Geography (5 tools):");
+    console.log("- get_data, get_continents, get_countries, get_currencies, get_current_currency");
+    console.log("");
+    console.log("📄 WordPress Posts (4 tools):");
+    console.log("- create_post, get_posts, update_post, get_post_meta");
+    console.log("");
+    console.log("💳 Payment Gateways (3 tools):");
+    console.log("- get_payment_gateways, get_payment_gateway, update_payment_gateway");
+    console.log("");
+    console.log("⚙️ System (3 tools):");
+    console.log("- get_system_status, get_system_status_tools, run_system_status_tool");
+    console.log("");
+    console.log("🎯 TOTAL: 91 COMPREHENSIVE WOOCOMMERCE TOOLS");
+    console.log("");
+    console.log("📋 Environment variables:");
+    console.log("- WORDPRESS_SITE_URL: Your WordPress site URL");
+    console.log("- WOOCOMMERCE_CONSUMER_KEY: WooCommerce API consumer key");
+    console.log("- WOOCOMMERCE_CONSUMER_SECRET: WooCommerce API consumer secret");
+    console.log("- WORDPRESS_USERNAME: WordPress username (for WordPress API)");
+    console.log("- WORDPRESS_PASSWORD: WordPress password (for WordPress API)");
 
   } catch (error) {
     console.error("Failed to start server:", error);
@@ -4281,12 +4290,12 @@ async function main() {
 
 // Handle graceful shutdown
 process.on("SIGINT", () => {
-  console.error("Shutting down WooCommerce MCP Server...");
+  console.log("🔄 Shutting down WooCommerce MCP Server...");
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-  console.error("Shutting down WooCommerce MCP Server...");
+  console.log("🔄 Shutting down WooCommerce MCP Server...");
   process.exit(0);
 });
 
