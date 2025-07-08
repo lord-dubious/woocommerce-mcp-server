@@ -96,14 +96,59 @@ This server has been completely rewritten to properly implement the MCP standard
 - `get_products_report` - Get products performance report
 - `get_orders_report` - Get orders analytics report
 - `get_customers_report` - Get customers analytics report
+- `get_categories_report` - Get categories performance report
+- `get_stock_report` - Get stock levels report
+- `get_coupons_report` - Get coupons usage report
+- `get_taxes_report` - Get taxes report
 
 ### 💳 Payment Gateways
 - `get_payment_gateways` - Retrieve all payment gateways
 - `get_payment_gateway` - Get specific payment gateway
 - `update_payment_gateway` - Update payment gateway settings
 
+### 🔗 Meta Data Operations
+- `get_product_meta` - Retrieve product meta data
+- `create_product_meta` - Create/update product meta data
+- `update_product_meta` - Update product meta data
+- `delete_product_meta` - Delete product meta data
+- `get_order_meta` - Retrieve order meta data
+- `create_order_meta` - Create/update order meta data
+- `update_order_meta` - Update order meta data
+- `delete_order_meta` - Delete order meta data
+- `get_customer_meta` - Retrieve customer meta data
+- `create_customer_meta` - Create/update customer meta data
+- `update_customer_meta` - Update customer meta data
+- `delete_customer_meta` - Delete customer meta data
+
+### ⭐ Product Reviews
+- `get_product_reviews` - Retrieve product reviews
+- `get_product_review` - Get specific review by ID
+- `create_product_review` - Create new product reviews
+- `update_product_review` - Update existing reviews
+- `delete_product_review` - Delete reviews
+
+### ⚙️ Settings Management
+- `get_settings` - Retrieve WooCommerce settings groups
+- `get_setting_options` - Get options for specific settings group
+- `update_setting_option` - Update specific setting options
+
+### 🌍 Data & Geography
+- `get_data` - Retrieve general WooCommerce data
+- `get_continents` - Get continents and their countries
+- `get_countries` - Get list of countries
+- `get_currencies` - Get available currencies
+- `get_current_currency` - Get current currency information
+
+### 📄 WordPress Posts Management
+- `create_post` - Create new WordPress posts
+- `get_posts` - Retrieve WordPress posts
+- `update_post` - Update existing posts
+- `get_post_meta` - Get WordPress post meta data
+
 ### ⚙️ System Information
 - `get_system_status` - Get WooCommerce system status and diagnostics
+- `get_system_status_tools` - Get available system status tools
+- `run_system_status_tool` - Execute system status tools
 
 ## Installation
 
@@ -326,7 +371,7 @@ TEST_WOOCOMMERCE_CONSUMER_SECRET=cs_your_test_secret
 **⚠️ Important**: Always use a test/staging site, never your production store!
 
 #### What Gets Tested
-- ✅ All 56 WooCommerce tools
+- ✅ All 89 WooCommerce tools
 - ✅ Schema validation for all data types
 - ✅ Error handling and edge cases
 - ✅ API connectivity and authentication

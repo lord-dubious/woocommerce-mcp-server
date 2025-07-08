@@ -22,6 +22,12 @@ const WooCommerceCredentialsSchema = z.object({
   consumerSecret: z.string().optional(),
 });
 
+const WordPressCredentialsSchema = z.object({
+  siteUrl: z.string().url().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+});
+
 const ProductDataSchema = z.object({
   name: z.string(),
   type: z.enum(["simple", "grouped", "external", "variable"]).default("simple"),
@@ -2577,6 +2583,1582 @@ server.registerTool(
   }
 );
 
+// Meta Data Operations for Products
+server.registerTool(
+  "get_product_meta",
+  {
+    title: "Get Product Meta Data",
+    description: "Retrieve meta data for a specific product",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      productId: z.number().positive(),
+      metaKey: z.string().optional(),
+    },
+  },
+  async ({ credentials = {}, productId, metaKey }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get(`/products/${productId}`);
+
+      const metaData = response.data.meta_data || [];
+
+      // If a specific key is requested, filter the meta data
+      const result = metaKey
+        ? metaData.filter((meta: any) => meta.key === metaKey)
+        : metaData;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Product meta data:\n\n${JSON.stringify(result, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving product meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "create_product_meta",
+  {
+    title: "Create Product Meta Data",
+    description: "Create or update meta data for a product",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      productId: z.number().positive(),
+      metaKey: z.string(),
+      metaValue: z.any(),
+    },
+  },
+  async ({ credentials = {}, productId, metaKey, metaValue }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current product data
+      const productResponse = await client.get(`/products/${productId}`);
+      const product = productResponse.data;
+      let metaData = product.meta_data || [];
+
+      // Look for existing meta with the same key
+      const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+      if (existingMetaIndex >= 0) {
+        // Update existing meta
+        metaData[existingMetaIndex].value = metaValue;
+      } else {
+        // Add new meta
+        metaData.push({ key: metaKey, value: metaValue });
+      }
+
+      // Update the product with the modified meta_data
+      const response = await client.put(`/products/${productId}`, {
+        meta_data: metaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Product meta data updated successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error creating product meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "update_product_meta",
+  {
+    title: "Update Product Meta Data",
+    description: "Update existing meta data for a product",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      productId: z.number().positive(),
+      metaKey: z.string(),
+      metaValue: z.any(),
+    },
+  },
+  async ({ credentials = {}, productId, metaKey, metaValue }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current product data
+      const productResponse = await client.get(`/products/${productId}`);
+      const product = productResponse.data;
+      let metaData = product.meta_data || [];
+
+      // Look for existing meta with the same key
+      const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+      if (existingMetaIndex >= 0) {
+        // Update existing meta
+        metaData[existingMetaIndex].value = metaValue;
+      } else {
+        // Add new meta if it doesn't exist
+        metaData.push({ key: metaKey, value: metaValue });
+      }
+
+      // Update the product with the modified meta_data
+      const response = await client.put(`/products/${productId}`, {
+        meta_data: metaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Product meta data updated successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating product meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "delete_product_meta",
+  {
+    title: "Delete Product Meta Data",
+    description: "Delete meta data from a product",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      productId: z.number().positive(),
+      metaKey: z.string(),
+    },
+  },
+  async ({ credentials = {}, productId, metaKey }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current product data
+      const productResponse = await client.get(`/products/${productId}`);
+      const product = productResponse.data;
+      let metaData = product.meta_data || [];
+
+      // Filter out the meta key to delete
+      const updatedMetaData = metaData.filter((meta: any) => meta.key !== metaKey);
+
+      // Update the product with the filtered meta_data
+      const response = await client.put(`/products/${productId}`, {
+        meta_data: updatedMetaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Product meta data deleted successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error deleting product meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Meta Data Operations for Orders
+server.registerTool(
+  "get_order_meta",
+  {
+    title: "Get Order Meta Data",
+    description: "Retrieve meta data for a specific order",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      orderId: z.number().positive(),
+      metaKey: z.string().optional(),
+    },
+  },
+  async ({ credentials = {}, orderId, metaKey }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get(`/orders/${orderId}`);
+
+      const metaData = response.data.meta_data || [];
+
+      // If a specific key is requested, filter the meta data
+      const result = metaKey
+        ? metaData.filter((meta: any) => meta.key === metaKey)
+        : metaData;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Order meta data:\n\n${JSON.stringify(result, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving order meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "create_order_meta",
+  {
+    title: "Create Order Meta Data",
+    description: "Create or update meta data for an order",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      orderId: z.number().positive(),
+      metaKey: z.string(),
+      metaValue: z.any(),
+    },
+  },
+  async ({ credentials = {}, orderId, metaKey, metaValue }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current order data
+      const orderResponse = await client.get(`/orders/${orderId}`);
+      const order = orderResponse.data;
+      let metaData = order.meta_data || [];
+
+      // Look for existing meta with the same key
+      const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+      if (existingMetaIndex >= 0) {
+        // Update existing meta
+        metaData[existingMetaIndex].value = metaValue;
+      } else {
+        // Add new meta
+        metaData.push({ key: metaKey, value: metaValue });
+      }
+
+      // Update the order with the modified meta_data
+      const response = await client.put(`/orders/${orderId}`, {
+        meta_data: metaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Order meta data updated successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error creating order meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "update_order_meta",
+  {
+    title: "Update Order Meta Data",
+    description: "Update existing meta data for an order",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      orderId: z.number().positive(),
+      metaKey: z.string(),
+      metaValue: z.any(),
+    },
+  },
+  async ({ credentials = {}, orderId, metaKey, metaValue }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current order data
+      const orderResponse = await client.get(`/orders/${orderId}`);
+      const order = orderResponse.data;
+      let metaData = order.meta_data || [];
+
+      // Look for existing meta with the same key
+      const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+      if (existingMetaIndex >= 0) {
+        // Update existing meta
+        metaData[existingMetaIndex].value = metaValue;
+      } else {
+        // Add new meta if it doesn't exist
+        metaData.push({ key: metaKey, value: metaValue });
+      }
+
+      // Update the order with the modified meta_data
+      const response = await client.put(`/orders/${orderId}`, {
+        meta_data: metaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Order meta data updated successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating order meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "delete_order_meta",
+  {
+    title: "Delete Order Meta Data",
+    description: "Delete meta data from an order",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      orderId: z.number().positive(),
+      metaKey: z.string(),
+    },
+  },
+  async ({ credentials = {}, orderId, metaKey }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current order data
+      const orderResponse = await client.get(`/orders/${orderId}`);
+      const order = orderResponse.data;
+      let metaData = order.meta_data || [];
+
+      // Filter out the meta key to delete
+      const updatedMetaData = metaData.filter((meta: any) => meta.key !== metaKey);
+
+      // Update the order with the filtered meta_data
+      const response = await client.put(`/orders/${orderId}`, {
+        meta_data: updatedMetaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Order meta data deleted successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error deleting order meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Meta Data Operations for Customers
+server.registerTool(
+  "get_customer_meta",
+  {
+    title: "Get Customer Meta Data",
+    description: "Retrieve meta data for a specific customer",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      customerId: z.number().positive(),
+      metaKey: z.string().optional(),
+    },
+  },
+  async ({ credentials = {}, customerId, metaKey }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get(`/customers/${customerId}`);
+
+      const metaData = response.data.meta_data || [];
+
+      // If a specific key is requested, filter the meta data
+      const result = metaKey
+        ? metaData.filter((meta: any) => meta.key === metaKey)
+        : metaData;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Customer meta data:\n\n${JSON.stringify(result, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving customer meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "create_customer_meta",
+  {
+    title: "Create Customer Meta Data",
+    description: "Create or update meta data for a customer",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      customerId: z.number().positive(),
+      metaKey: z.string(),
+      metaValue: z.any(),
+    },
+  },
+  async ({ credentials = {}, customerId, metaKey, metaValue }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current customer data
+      const customerResponse = await client.get(`/customers/${customerId}`);
+      const customer = customerResponse.data;
+      let metaData = customer.meta_data || [];
+
+      // Look for existing meta with the same key
+      const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+      if (existingMetaIndex >= 0) {
+        // Update existing meta
+        metaData[existingMetaIndex].value = metaValue;
+      } else {
+        // Add new meta
+        metaData.push({ key: metaKey, value: metaValue });
+      }
+
+      // Update the customer with the modified meta_data
+      const response = await client.put(`/customers/${customerId}`, {
+        meta_data: metaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Customer meta data updated successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error creating customer meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "update_customer_meta",
+  {
+    title: "Update Customer Meta Data",
+    description: "Update existing meta data for a customer",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      customerId: z.number().positive(),
+      metaKey: z.string(),
+      metaValue: z.any(),
+    },
+  },
+  async ({ credentials = {}, customerId, metaKey, metaValue }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current customer data
+      const customerResponse = await client.get(`/customers/${customerId}`);
+      const customer = customerResponse.data;
+      let metaData = customer.meta_data || [];
+
+      // Look for existing meta with the same key
+      const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+      if (existingMetaIndex >= 0) {
+        // Update existing meta
+        metaData[existingMetaIndex].value = metaValue;
+      } else {
+        // Add new meta if it doesn't exist
+        metaData.push({ key: metaKey, value: metaValue });
+      }
+
+      // Update the customer with the modified meta_data
+      const response = await client.put(`/customers/${customerId}`, {
+        meta_data: metaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Customer meta data updated successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating customer meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "delete_customer_meta",
+  {
+    title: "Delete Customer Meta Data",
+    description: "Delete meta data from a customer",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      customerId: z.number().positive(),
+      metaKey: z.string(),
+    },
+  },
+  async ({ credentials = {}, customerId, metaKey }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+
+      // Get current customer data
+      const customerResponse = await client.get(`/customers/${customerId}`);
+      const customer = customerResponse.data;
+      let metaData = customer.meta_data || [];
+
+      // Filter out the meta key to delete
+      const updatedMetaData = metaData.filter((meta: any) => meta.key !== metaKey);
+
+      // Update the customer with the filtered meta_data
+      const response = await client.put(`/customers/${customerId}`, {
+        meta_data: updatedMetaData,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Customer meta data deleted successfully:\n\n${JSON.stringify(response.data.meta_data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error deleting customer meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Product Reviews Tools
+server.registerTool(
+  "get_product_reviews",
+  {
+    title: "Get Product Reviews",
+    description: "Retrieve product reviews from WooCommerce",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      productId: z.number().positive().optional(),
+      perPage: z.number().min(1).max(100).default(10),
+      page: z.number().min(1).default(1),
+      status: z.enum(["approved", "hold", "spam", "unspam", "trash", "untrash"]).optional(),
+      reviewer: z.string().optional(),
+      reviewer_email: z.string().email().optional(),
+    },
+  },
+  async ({ credentials = {}, productId, perPage = 10, page = 1, ...filters }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const endpoint = productId ? `/products/${productId}/reviews` : "/products/reviews";
+
+      const response = await client.get(endpoint, {
+        params: {
+          per_page: perPage,
+          page,
+          ...filters,
+        },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${response.data.length} reviews:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving reviews: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_product_review",
+  {
+    title: "Get Product Review",
+    description: "Retrieve a specific product review by ID",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      reviewId: z.number().positive(),
+      productId: z.number().positive().optional(),
+    },
+  },
+  async ({ credentials = {}, reviewId, productId }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const endpoint = productId
+        ? `/products/${productId}/reviews/${reviewId}`
+        : `/products/reviews/${reviewId}`;
+
+      const response = await client.get(endpoint);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Review details:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving review: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "create_product_review",
+  {
+    title: "Create Product Review",
+    description: "Create a new product review",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      productId: z.number().positive(),
+      reviewData: ReviewDataSchema,
+    },
+  },
+  async ({ credentials = {}, productId, reviewData }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.post(`/products/${productId}/reviews`, reviewData);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Review created successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error creating review: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "update_product_review",
+  {
+    title: "Update Product Review",
+    description: "Update an existing product review",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      reviewId: z.number().positive(),
+      productId: z.number().positive().optional(),
+      reviewData: ReviewDataSchema.partial(),
+    },
+  },
+  async ({ credentials = {}, reviewId, productId, reviewData }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const endpoint = productId
+        ? `/products/${productId}/reviews/${reviewId}`
+        : `/products/reviews/${reviewId}`;
+
+      const response = await client.put(endpoint, reviewData);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Review updated successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating review: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "delete_product_review",
+  {
+    title: "Delete Product Review",
+    description: "Delete a product review",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      reviewId: z.number().positive(),
+      productId: z.number().positive().optional(),
+      force: z.boolean().default(false),
+    },
+  },
+  async ({ credentials = {}, reviewId, productId, force = false }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const endpoint = productId
+        ? `/products/${productId}/reviews/${reviewId}`
+        : `/products/reviews/${reviewId}`;
+
+      const response = await client.delete(endpoint, {
+        params: { force },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Review ${force ? "permanently deleted" : "moved to trash"} successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error deleting review: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Settings Management Tools
+server.registerTool(
+  "get_settings",
+  {
+    title: "Get Settings",
+    description: "Retrieve WooCommerce settings groups",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/settings");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Settings groups:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving settings: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_setting_options",
+  {
+    title: "Get Setting Options",
+    description: "Retrieve options for a specific settings group",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      group: z.string(),
+    },
+  },
+  async ({ credentials = {}, group }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get(`/settings/${group}`);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Settings for group '${group}':\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving setting options: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "update_setting_option",
+  {
+    title: "Update Setting Option",
+    description: "Update a specific setting option",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      group: z.string(),
+      id: z.string(),
+      settingData: SettingDataSchema,
+    },
+  },
+  async ({ credentials = {}, group, id, settingData }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.put(`/settings/${group}/${id}`, settingData);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Setting updated successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating setting: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Additional Reports Tools
+server.registerTool(
+  "get_categories_report",
+  {
+    title: "Get Categories Report",
+    description: "Retrieve categories report data from WooCommerce",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      perPage: z.number().min(1).max(100).default(10),
+      page: z.number().min(1).default(1),
+    },
+  },
+  async ({ credentials = {}, perPage = 10, page = 1 }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/reports/categories", {
+        params: {
+          per_page: perPage,
+          page,
+        },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Categories Report:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving categories report: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_stock_report",
+  {
+    title: "Get Stock Report",
+    description: "Retrieve stock report data from WooCommerce",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      perPage: z.number().min(1).max(100).default(10),
+      page: z.number().min(1).default(1),
+    },
+  },
+  async ({ credentials = {}, perPage = 10, page = 1 }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/reports/stock", {
+        params: {
+          per_page: perPage,
+          page,
+        },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Stock Report:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving stock report: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_coupons_report",
+  {
+    title: "Get Coupons Report",
+    description: "Retrieve coupons report data from WooCommerce",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      period: z.enum(["week", "month", "last_month", "year"]).default("month"),
+      date_min: z.string().optional(),
+      date_max: z.string().optional(),
+      perPage: z.number().min(1).max(100).default(10),
+      page: z.number().min(1).default(1),
+    },
+  },
+  async ({ credentials = {}, period = "month", date_min, date_max, perPage = 10, page = 1 }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/reports/coupons", {
+        params: {
+          period,
+          date_min,
+          date_max,
+          per_page: perPage,
+          page,
+        },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Coupons Report:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving coupons report: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_taxes_report",
+  {
+    title: "Get Taxes Report",
+    description: "Retrieve taxes report data from WooCommerce",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      period: z.enum(["week", "month", "last_month", "year"]).default("month"),
+      date_min: z.string().optional(),
+      date_max: z.string().optional(),
+      perPage: z.number().min(1).max(100).default(10),
+      page: z.number().min(1).default(1),
+    },
+  },
+  async ({ credentials = {}, period = "month", date_min, date_max, perPage = 10, page = 1 }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/reports/taxes", {
+        params: {
+          period,
+          date_min,
+          date_max,
+          per_page: perPage,
+          page,
+        },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Taxes Report:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving taxes report: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Data & Geography Tools
+server.registerTool(
+  "get_data",
+  {
+    title: "Get Data",
+    description: "Retrieve general WooCommerce data information",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/data");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `WooCommerce Data:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving data: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_continents",
+  {
+    title: "Get Continents",
+    description: "Retrieve list of continents and their countries",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/data/continents");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Continents:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving continents: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_countries",
+  {
+    title: "Get Countries",
+    description: "Retrieve list of countries",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/data/countries");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Countries:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving countries: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_currencies",
+  {
+    title: "Get Currencies",
+    description: "Retrieve list of available currencies",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/data/currencies");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Currencies:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving currencies: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_current_currency",
+  {
+    title: "Get Current Currency",
+    description: "Retrieve current currency information",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/data/currencies/current");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Current Currency:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving current currency: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// WordPress Posts Management Tools
+server.registerTool(
+  "create_post",
+  {
+    title: "Create WordPress Post",
+    description: "Create a new WordPress post",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      postData: PostDataSchema,
+    },
+  },
+  async ({ credentials = {}, postData }) => {
+    try {
+      const client = createWordPressClient(credentials);
+      const response = await client.post("/posts", postData);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Post created successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error creating post: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_posts",
+  {
+    title: "Get WordPress Posts",
+    description: "Retrieve WordPress posts",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      perPage: z.number().min(1).max(100).default(10),
+      page: z.number().min(1).default(1),
+      search: z.string().optional(),
+      status: z.enum(["publish", "draft", "private", "pending"]).optional(),
+      author: z.number().optional(),
+    },
+  },
+  async ({ credentials = {}, perPage = 10, page = 1, ...filters }) => {
+    try {
+      const client = createWordPressClient(credentials);
+      const response = await client.get("/posts", {
+        params: {
+          per_page: perPage,
+          page,
+          ...filters,
+        },
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${response.data.length} posts:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving posts: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "update_post",
+  {
+    title: "Update WordPress Post",
+    description: "Update an existing WordPress post",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      postId: z.number().positive(),
+      postData: PostDataSchema.partial(),
+    },
+  },
+  async ({ credentials = {}, postId, postData }) => {
+    try {
+      const client = createWordPressClient(credentials);
+      const response = await client.put(`/posts/${postId}`, postData);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Post updated successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating post: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_post_meta",
+  {
+    title: "Get WordPress Post Meta",
+    description: "Retrieve meta data for a WordPress post",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      postId: z.number().positive(),
+      metaKey: z.string().optional(),
+    },
+  },
+  async ({ credentials = {}, postId, metaKey }) => {
+    try {
+      const client = createWordPressClient(credentials);
+      const endpoint = metaKey ? `/posts/${postId}/meta/${metaKey}` : `/posts/${postId}/meta`;
+      const response = await client.get(endpoint);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Post meta data:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving post meta: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// System Status Tools
+server.registerTool(
+  "get_system_status_tools",
+  {
+    title: "Get System Status Tools",
+    description: "Retrieve available system status tools",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+    },
+  },
+  async ({ credentials = {} }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.get("/system_status/tools");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `System Status Tools:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving system status tools: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "run_system_status_tool",
+  {
+    title: "Run System Status Tool",
+    description: "Execute a specific system status tool",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      toolId: z.string(),
+    },
+  },
+  async ({ credentials = {}, toolId }) => {
+    try {
+      const client = createWooCommerceClient(credentials);
+      const response = await client.put(`/system_status/tools/${toolId}`);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `System tool executed successfully:\n\n${JSON.stringify(response.data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error running system tool: ${handleApiError(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 // Main function to start the server
 async function main() {
   try {
@@ -2590,33 +4172,62 @@ async function main() {
     console.error("WooCommerce MCP Server is running...");
     console.error("Available tools:");
     console.error("");
-    console.error("📦 Product Management:");
+    console.error("📦 Product Management (6 tools):");
     console.error("- get_products, get_product, create_product, update_product, delete_product");
     console.error("");
-    console.error("📋 Order Management:");
+    console.error("📋 Order Management (5 tools):");
     console.error("- get_orders, get_order, create_order, update_order, delete_order");
     console.error("");
-    console.error("👥 Customer Management:");
+    console.error("👥 Customer Management (5 tools):");
     console.error("- get_customers, get_customer, create_customer, update_customer, delete_customer");
     console.error("");
-    console.error("🏷️ Categories & Tags:");
+    console.error("🏷️ Categories & Tags (10 tools):");
     console.error("- get_product_categories, get_product_category, create_product_category, update_product_category, delete_product_category");
     console.error("- get_product_tags, get_product_tag, create_product_tag, update_product_tag, delete_product_tag");
     console.error("");
-    console.error("🎫 Coupons:");
+    console.error("🎫 Coupons (5 tools):");
     console.error("- get_coupons, get_coupon, create_coupon, update_coupon, delete_coupon");
     console.error("");
-    console.error("🔧 Product Attributes:");
+    console.error("🔧 Product Attributes (5 tools):");
     console.error("- get_product_attributes, get_product_attribute, create_product_attribute, update_product_attribute, delete_product_attribute");
     console.error("");
-    console.error("📊 Reports & Analytics:");
-    console.error("- get_sales_report, get_products_report, get_orders_report, get_customers_report");
+    console.error("🔄 Product Variations (5 tools):");
+    console.error("- get_product_variations, get_product_variation, create_product_variation, update_product_variation, delete_product_variation");
     console.error("");
-    console.error("💳 Payment Gateways:");
+    console.error("📝 Order Notes (4 tools):");
+    console.error("- get_order_notes, get_order_note, create_order_note, delete_order_note");
+    console.error("");
+    console.error("💰 Order Refunds (4 tools):");
+    console.error("- get_order_refunds, get_order_refund, create_order_refund, delete_order_refund");
+    console.error("");
+    console.error("🔗 Meta Data Operations (9 tools):");
+    console.error("- get_product_meta, create_product_meta, update_product_meta, delete_product_meta");
+    console.error("- get_order_meta, create_order_meta, update_order_meta, delete_order_meta");
+    console.error("- get_customer_meta, create_customer_meta, update_customer_meta, delete_customer_meta");
+    console.error("");
+    console.error("⭐ Product Reviews (5 tools):");
+    console.error("- get_product_reviews, get_product_review, create_product_review, update_product_review, delete_product_review");
+    console.error("");
+    console.error("⚙️ Settings Management (3 tools):");
+    console.error("- get_settings, get_setting_options, update_setting_option");
+    console.error("");
+    console.error("📊 Reports & Analytics (8 tools):");
+    console.error("- get_sales_report, get_products_report, get_orders_report, get_customers_report");
+    console.error("- get_categories_report, get_stock_report, get_coupons_report, get_taxes_report");
+    console.error("");
+    console.error("🌍 Data & Geography (5 tools):");
+    console.error("- get_data, get_continents, get_countries, get_currencies, get_current_currency");
+    console.error("");
+    console.error("📄 WordPress Posts (4 tools):");
+    console.error("- create_post, get_posts, update_post, get_post_meta");
+    console.error("");
+    console.error("💳 Payment Gateways (3 tools):");
     console.error("- get_payment_gateways, get_payment_gateway, update_payment_gateway");
     console.error("");
-    console.error("⚙️ System:");
-    console.error("- get_system_status");
+    console.error("⚙️ System (3 tools):");
+    console.error("- get_system_status, get_system_status_tools, run_system_status_tool");
+    console.error("");
+    console.error("🎯 TOTAL: 89 COMPREHENSIVE WOOCOMMERCE TOOLS");
     console.error("");
     console.error("Environment variables:");
     console.error("- WORDPRESS_SITE_URL: Your WordPress site URL");
