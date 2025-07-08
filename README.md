@@ -155,6 +155,9 @@ This server has been completely rewritten to properly implement the MCP standard
 - `create_template` - Create custom product templates
 - `get_template` - Retrieve specific templates
 - `validate_file` - Validate files before processing
+- `bulk_create_products` - Enterprise-grade bulk product creation
+- `ai_enhance_products` - AI-powered product enhancement and SEO
+- `ai_workflow_complete` - End-to-end automated workflows
 
 ## Installation
 
@@ -465,7 +468,7 @@ TEST_WOOCOMMERCE_CONSUMER_SECRET=cs_your_test_secret
 **⚠️ Important**: Always use a test/staging site, never your production store!
 
 #### What Gets Tested
-- ✅ All 98 WooCommerce + AI tools
+- ✅ All 101 WooCommerce + AI tools
 - ✅ Schema validation for all data types
 - ✅ Error handling and edge cases
 - ✅ API connectivity and authentication
