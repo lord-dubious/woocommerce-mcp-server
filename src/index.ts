@@ -294,6 +294,54 @@ function createWordPressClient(credentials: z.infer<typeof WooCommerceCredential
   });
 }
 
+// Generic meta data helper functions to reduce code duplication
+async function getEntityMeta(client: any, entityType: string, entityId: number, metaKey?: string) {
+  const response = await client.get(`/${entityType}/${entityId}`);
+  const metaData = response.data.meta_data || [];
+
+  return metaKey
+    ? metaData.filter((meta: any) => meta.key === metaKey)
+    : metaData;
+}
+
+async function updateEntityMeta(client: any, entityType: string, entityId: number, metaKey: string, metaValue: any) {
+  // Get current entity data
+  const entityResponse = await client.get(`/${entityType}/${entityId}`);
+  const entity = entityResponse.data;
+  let metaData = entity.meta_data || [];
+
+  // Look for existing meta with the same key
+  const existingMetaIndex = metaData.findIndex((meta: any) => meta.key === metaKey);
+
+  if (existingMetaIndex >= 0) {
+    // Update existing meta
+    metaData[existingMetaIndex].value = metaValue;
+  } else {
+    // Add new meta
+    metaData.push({ key: metaKey, value: metaValue });
+  }
+
+  // Update the entity with the modified meta_data
+  return await client.put(`/${entityType}/${entityId}`, {
+    meta_data: metaData,
+  });
+}
+
+async function deleteEntityMeta(client: any, entityType: string, entityId: number, metaKey: string) {
+  // Get current entity data
+  const entityResponse = await client.get(`/${entityType}/${entityId}`);
+  const entity = entityResponse.data;
+  let metaData = entity.meta_data || [];
+
+  // Filter out the meta key to delete
+  const updatedMetaData = metaData.filter((meta: any) => meta.key !== metaKey);
+
+  // Update the entity with the filtered meta_data
+  return await client.put(`/${entityType}/${entityId}`, {
+    meta_data: updatedMetaData,
+  });
+}
+
 // Error handling helper
 function handleApiError(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -3244,15 +3292,18 @@ server.registerTool(
   async ({ credentials = {}, productId, perPage = 10, page = 1, ...filters }) => {
     try {
       const client = createWooCommerceClient(credentials);
-      const endpoint = productId ? `/products/${productId}/reviews` : "/products/reviews";
+      const params: any = {
+        per_page: perPage,
+        page,
+        ...filters,
+      };
 
-      const response = await client.get(endpoint, {
-        params: {
-          per_page: perPage,
-          page,
-          ...filters,
-        },
-      });
+      // Add product filter if specified
+      if (productId) {
+        params.product = productId;
+      }
+
+      const response = await client.get("/products/reviews", { params });
 
       return {
         content: [
@@ -3284,17 +3335,12 @@ server.registerTool(
     inputSchema: {
       credentials: WooCommerceCredentialsSchema.optional(),
       reviewId: z.number().positive(),
-      productId: z.number().positive().optional(),
     },
   },
-  async ({ credentials = {}, reviewId, productId }) => {
+  async ({ credentials = {}, reviewId }) => {
     try {
       const client = createWooCommerceClient(credentials);
-      const endpoint = productId
-        ? `/products/${productId}/reviews/${reviewId}`
-        : `/products/reviews/${reviewId}`;
-
-      const response = await client.get(endpoint);
+      const response = await client.get(`/products/reviews/${reviewId}`);
 
       return {
         content: [
@@ -3325,14 +3371,15 @@ server.registerTool(
     description: "Create a new product review",
     inputSchema: {
       credentials: WooCommerceCredentialsSchema.optional(),
-      productId: z.number().positive(),
-      reviewData: ReviewDataSchema,
+      reviewData: ReviewDataSchema.extend({
+        product_id: z.number().positive(),
+      }),
     },
   },
-  async ({ credentials = {}, productId, reviewData }) => {
+  async ({ credentials = {}, reviewData }) => {
     try {
       const client = createWooCommerceClient(credentials);
-      const response = await client.post(`/products/${productId}/reviews`, reviewData);
+      const response = await client.post("/products/reviews", reviewData);
 
       return {
         content: [
@@ -3364,18 +3411,13 @@ server.registerTool(
     inputSchema: {
       credentials: WooCommerceCredentialsSchema.optional(),
       reviewId: z.number().positive(),
-      productId: z.number().positive().optional(),
       reviewData: ReviewDataSchema.partial(),
     },
   },
-  async ({ credentials = {}, reviewId, productId, reviewData }) => {
+  async ({ credentials = {}, reviewId, reviewData }) => {
     try {
       const client = createWooCommerceClient(credentials);
-      const endpoint = productId
-        ? `/products/${productId}/reviews/${reviewId}`
-        : `/products/reviews/${reviewId}`;
-
-      const response = await client.put(endpoint, reviewData);
+      const response = await client.put(`/products/reviews/${reviewId}`, reviewData);
 
       return {
         content: [
@@ -3407,18 +3449,13 @@ server.registerTool(
     inputSchema: {
       credentials: WooCommerceCredentialsSchema.optional(),
       reviewId: z.number().positive(),
-      productId: z.number().positive().optional(),
       force: z.boolean().default(false),
     },
   },
-  async ({ credentials = {}, reviewId, productId, force = false }) => {
+  async ({ credentials = {}, reviewId, force = false }) => {
     try {
       const client = createWooCommerceClient(credentials);
-      const endpoint = productId
-        ? `/products/${productId}/reviews/${reviewId}`
-        : `/products/reviews/${reviewId}`;
-
-      const response = await client.delete(endpoint, {
+      const response = await client.delete(`/products/reviews/${reviewId}`, {
         params: { force },
       });
 
@@ -4200,7 +4237,7 @@ async function main() {
     console.error("💰 Order Refunds (4 tools):");
     console.error("- get_order_refunds, get_order_refund, create_order_refund, delete_order_refund");
     console.error("");
-    console.error("🔗 Meta Data Operations (9 tools):");
+    console.error("🔗 Meta Data Operations (12 tools):");
     console.error("- get_product_meta, create_product_meta, update_product_meta, delete_product_meta");
     console.error("- get_order_meta, create_order_meta, update_order_meta, delete_order_meta");
     console.error("- get_customer_meta, create_customer_meta, update_customer_meta, delete_customer_meta");
@@ -4227,7 +4264,7 @@ async function main() {
     console.error("⚙️ System (3 tools):");
     console.error("- get_system_status, get_system_status_tools, run_system_status_tool");
     console.error("");
-    console.error("🎯 TOTAL: 89 COMPREHENSIVE WOOCOMMERCE TOOLS");
+    console.error("🎯 TOTAL: 91 COMPREHENSIVE WOOCOMMERCE TOOLS");
     console.error("");
     console.error("Environment variables:");
     console.error("- WORDPRESS_SITE_URL: Your WordPress site URL");

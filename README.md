@@ -108,24 +108,21 @@ This server has been completely rewritten to properly implement the MCP standard
 
 ### 🔗 Meta Data Operations
 - `get_product_meta` - Retrieve product meta data
-- `create_product_meta` - Create/update product meta data
-- `update_product_meta` - Update product meta data
+- `set_product_meta` - Set (create/update) product meta data
 - `delete_product_meta` - Delete product meta data
 - `get_order_meta` - Retrieve order meta data
-- `create_order_meta` - Create/update order meta data
-- `update_order_meta` - Update order meta data
+- `set_order_meta` - Set (create/update) order meta data
 - `delete_order_meta` - Delete order meta data
 - `get_customer_meta` - Retrieve customer meta data
-- `create_customer_meta` - Create/update customer meta data
-- `update_customer_meta` - Update customer meta data
+- `set_customer_meta` - Set (create/update) customer meta data
 - `delete_customer_meta` - Delete customer meta data
 
 ### ⭐ Product Reviews
 - `get_product_reviews` - Retrieve product reviews
 - `get_product_review` - Get specific review by ID
-- `create_product_review` - Create new product reviews
-- `update_product_review` - Update existing reviews
-- `delete_product_review` - Delete reviews
+- `create_product_review` - Create new product review
+- `update_product_review` - Update existing review
+- `delete_product_review` - Delete review
 
 ### ⚙️ Settings Management
 - `get_settings` - Retrieve WooCommerce settings groups
@@ -135,7 +132,7 @@ This server has been completely rewritten to properly implement the MCP standard
 ### 🌍 Data & Geography
 - `get_data` - Retrieve general WooCommerce data
 - `get_continents` - Get continents and their countries
-- `get_countries` - Get list of countries
+- `get_countries` - Get a list of countries
 - `get_currencies` - Get available currencies
 - `get_current_currency` - Get current currency information
 
@@ -371,7 +368,7 @@ TEST_WOOCOMMERCE_CONSUMER_SECRET=cs_your_test_secret
 **⚠️ Important**: Always use a test/staging site, never your production store!
 
 #### What Gets Tested
-- ✅ All 89 WooCommerce tools
+- ✅ All 91 WooCommerce tools
 - ✅ Schema validation for all data types
 - ✅ Error handling and edge cases
 - ✅ API connectivity and authentication
