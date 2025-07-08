@@ -314,46 +314,65 @@ function checkToolCompleteness(): void {
   const implementedTools = [
     // Product Management (6)
     "get_products", "get_product", "create_product", "update_product", "delete_product",
-    
+
     // Order Management (5)
     "get_orders", "get_order", "create_order", "update_order", "delete_order",
-    
+
     // Customer Management (5)
     "get_customers", "get_customer", "create_customer", "update_customer", "delete_customer",
-    
+
     // Categories (5)
-    "get_product_categories", "get_product_category", "create_product_category", 
+    "get_product_categories", "get_product_category", "create_product_category",
     "update_product_category", "delete_product_category",
-    
+
     // Tags (5)
-    "get_product_tags", "get_product_tag", "create_product_tag", 
+    "get_product_tags", "get_product_tag", "create_product_tag",
     "update_product_tag", "delete_product_tag",
-    
+
     // Coupons (5)
     "get_coupons", "get_coupon", "create_coupon", "update_coupon", "delete_coupon",
-    
+
     // Attributes (5)
     "get_product_attributes", "get_product_attribute", "create_product_attribute",
     "update_product_attribute", "delete_product_attribute",
-    
+
     // Variations (5)
     "get_product_variations", "get_product_variation", "create_product_variation",
     "update_product_variation", "delete_product_variation",
-    
+
     // Order Notes (4)
     "get_order_notes", "get_order_note", "create_order_note", "delete_order_note",
-    
+
     // Order Refunds (4)
     "get_order_refunds", "get_order_refund", "create_order_refund", "delete_order_refund",
-    
-    // Reports (4)
+
+    // Meta Data Operations (12)
+    "get_product_meta", "create_product_meta", "update_product_meta", "delete_product_meta",
+    "get_order_meta", "create_order_meta", "update_order_meta", "delete_order_meta",
+    "get_customer_meta", "create_customer_meta", "update_customer_meta", "delete_customer_meta",
+
+    // Product Reviews (5)
+    "get_product_reviews", "get_product_review", "create_product_review",
+    "update_product_review", "delete_product_review",
+
+    // Settings Management (3)
+    "get_settings", "get_setting_options", "update_setting_option",
+
+    // Reports (8)
     "get_sales_report", "get_products_report", "get_orders_report", "get_customers_report",
-    
+    "get_categories_report", "get_stock_report", "get_coupons_report", "get_taxes_report",
+
+    // Data & Geography (5)
+    "get_data", "get_continents", "get_countries", "get_currencies", "get_current_currency",
+
+    // WordPress Posts (4)
+    "create_post", "get_posts", "update_post", "get_post_meta",
+
     // Payment Gateways (3)
     "get_payment_gateways", "get_payment_gateway", "update_payment_gateway",
-    
-    // System (1)
-    "get_system_status",
+
+    // System (3)
+    "get_system_status", "get_system_status_tools", "run_system_status_tool",
   ];
 
   console.log(`✅ Total Tools Implemented: ${implementedTools.length}`);
@@ -368,9 +387,14 @@ function checkToolCompleteness(): void {
   console.log("- Variations: 5 tools");
   console.log("- Order Notes: 4 tools");
   console.log("- Order Refunds: 4 tools");
-  console.log("- Reports: 4 tools");
+  console.log("- Meta Data Operations: 12 tools");
+  console.log("- Product Reviews: 5 tools");
+  console.log("- Settings Management: 3 tools");
+  console.log("- Reports: 8 tools");
+  console.log("- Data & Geography: 5 tools");
+  console.log("- WordPress Posts: 4 tools");
   console.log("- Payment Gateways: 3 tools");
-  console.log("- System: 1 tool");
+  console.log("- System: 3 tools");
 }
 
 // Main execution
