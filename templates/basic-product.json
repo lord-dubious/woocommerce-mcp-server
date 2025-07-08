@@ -1,0 +1,82 @@
+{
+  "name": "basic-product",
+  "description": "Basic product template for simple CSV imports",
+  "version": "1.0.0",
+  "author": "WooCommerce MCP Server",
+  "created": "2025-07-08T18:09:43.642Z",
+  "updated": "2025-07-08T18:09:43.643Z",
+  "fieldMappings": [
+    {
+      "sourceField": "name",
+      "targetField": "name",
+      "transform": "none",
+      "required": true
+    },
+    {
+      "sourceField": "description",
+      "targetField": "description",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "short_description",
+      "targetField": "short_description",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "price",
+      "targetField": "regular_price",
+      "transform": "price",
+      "required": true
+    },
+    {
+      "sourceField": "sale_price",
+      "targetField": "sale_price",
+      "transform": "price",
+      "required": false
+    },
+    {
+      "sourceField": "sku",
+      "targetField": "sku",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "stock",
+      "targetField": "stock_quantity",
+      "transform": "number",
+      "required": false
+    },
+    {
+      "sourceField": "weight",
+      "targetField": "weight",
+      "transform": "none",
+      "required": false
+    }
+  ],
+  "defaults": {
+    "type": "simple",
+    "status": "publish",
+    "catalog_visibility": "visible",
+    "manage_stock": true,
+    "stock_status": "instock",
+    "backorders": "no",
+    "sold_individually": false,
+    "reviews_allowed": true,
+    "menu_order": 0
+  },
+  "validation": {
+    "requiredFields": [
+      "name",
+      "regular_price"
+    ],
+    "uniqueFields": [
+      "sku"
+    ],
+    "priceValidation": {
+      "minPrice": 0.01,
+      "currency": "USD"
+    }
+  }
+}

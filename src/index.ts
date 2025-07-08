@@ -5,6 +5,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import axios from "axios";
 import { WooMetaData } from "./types.js";
+import { DocumentProcessor, DocumentProcessingConfigSchema, DocumentProcessingRequestSchema } from "./document-processor.js";
+import { TemplateManager, ProductTemplateConfigSchema } from "./template-manager.js";
+import { FileHandler, FileUploadSchema, FileSearchSchema } from "./file-handler.js";
 
 // Environment variables for WooCommerce/WordPress credentials
 const DEFAULT_SITE_URL = process.env.WORDPRESS_SITE_URL || "";
@@ -341,6 +344,24 @@ async function deleteEntityMeta(client: any, entityType: string, entityId: numbe
     meta_data: updatedMetaData,
   });
 }
+
+// Initialize document processing components
+const documentProcessor = new DocumentProcessor({
+  vllmEndpoint: process.env.VLLM_ENDPOINT,
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  model: process.env.AI_MODEL || 'gpt-4',
+  maxTokens: parseInt(process.env.AI_MAX_TOKENS || '4000'),
+  temperature: parseFloat(process.env.AI_TEMPERATURE || '0.7'),
+  uploadDir: process.env.UPLOAD_DIR || './uploads',
+  templateDir: process.env.TEMPLATE_DIR || './templates',
+});
+
+const templateManager = new TemplateManager(process.env.TEMPLATE_DIR || './templates');
+const fileHandler = new FileHandler({
+  uploadDir: process.env.UPLOAD_DIR || './uploads',
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '52428800'), // 50MB
+  allowedExtensions: ['.csv', '.xlsx', '.xls', '.pdf', '.docx', '.doc', '.txt', '.json', '.jpg', '.jpeg', '.png', '.gif', '.webp'],
+});
 
 // Error handling helper
 function handleApiError(error: unknown): string {
@@ -4196,6 +4217,323 @@ server.registerTool(
   }
 );
 
+// Document Processing Tools
+server.registerTool(
+  "upload_file",
+  {
+    title: "Upload File",
+    description: "Upload a file for document processing",
+    inputSchema: {
+      filePath: z.string(),
+      originalName: z.string().optional(),
+    },
+  },
+  async ({ filePath, originalName }) => {
+    try {
+      const fileInfo = await fileHandler.getFileInfo(filePath);
+      const uploadResult = await fileHandler.uploadFile({
+        originalName: originalName || fileInfo.name,
+        mimeType: fileInfo.mimeType,
+        size: fileInfo.size,
+        path: filePath,
+      });
+
+      if (!uploadResult.success) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Upload failed: ${uploadResult.error}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `File uploaded successfully to: ${uploadResult.filePath}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Upload error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "search_files",
+  {
+    title: "Search Files",
+    description: "Search for files in a directory with various filters",
+    inputSchema: {
+      directory: z.string().default('./uploads'),
+      extensions: z.array(z.string()).optional(),
+      maxSize: z.number().optional(),
+      recursive: z.boolean().default(true),
+      pattern: z.string().optional(),
+    },
+  },
+  async ({ directory = './uploads', extensions, maxSize, recursive = true, pattern }) => {
+    try {
+      const searchResult = await fileHandler.searchFiles({
+        directory,
+        extensions,
+        maxSize,
+        recursive,
+        pattern,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${searchResult.totalFiles} files (${(searchResult.totalSize / 1024 / 1024).toFixed(2)}MB total):\n\n${JSON.stringify(searchResult, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Search error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "process_document",
+  {
+    title: "Process Document",
+    description: "Process documents (CSV, Excel, PDF, etc.) for product creation using AI",
+    inputSchema: {
+      filePath: z.string(),
+      fileType: z.enum(['csv', 'xlsx', 'pdf', 'docx', 'txt', 'json']),
+      processingMode: z.enum(['extract', 'analyze', 'generate_products', 'bulk_upload']),
+      template: z.string().optional(),
+      customPrompt: z.string().optional(),
+      batchSize: z.number().min(1).max(100).default(10),
+      validateOnly: z.boolean().default(false),
+    },
+  },
+  async ({ filePath, fileType, processingMode, template, customPrompt, batchSize = 10, validateOnly = false }) => {
+    try {
+      const result = await documentProcessor.processDocument({
+        filePath,
+        fileType,
+        processingMode,
+        template,
+        customPrompt,
+        batchSize,
+        validateOnly,
+      });
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Processing failed: ${result.message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      let responseText = `Processing completed: ${result.message}`;
+
+      if (result.products && result.products.length > 0) {
+        responseText += `\n\nGenerated ${result.products.length} products`;
+        if (result.stats) {
+          responseText += `\nStats: ${JSON.stringify(result.stats, null, 2)}`;
+        }
+      }
+
+      if (result.data) {
+        responseText += `\n\nData: ${JSON.stringify(result.data, null, 2)}`;
+      }
+
+      if (result.errors && result.errors.length > 0) {
+        responseText += `\n\nErrors: ${result.errors.join(', ')}`;
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "list_templates",
+  {
+    title: "List Templates",
+    description: "List available product templates",
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const templates = await templateManager.listTemplates();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Available templates:\n\n${JSON.stringify(templates, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error listing templates: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "create_template",
+  {
+    title: "Create Template",
+    description: "Create a new product template",
+    inputSchema: {
+      name: z.string(),
+      template: ProductTemplateConfigSchema,
+    },
+  },
+  async ({ name, template }) => {
+    try {
+      await templateManager.saveTemplate(name, template);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Template '${name}' created successfully`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error creating template: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "get_template",
+  {
+    title: "Get Template",
+    description: "Retrieve a specific template",
+    inputSchema: {
+      name: z.string(),
+    },
+  },
+  async ({ name }) => {
+    try {
+      const template = await templateManager.loadTemplate(name);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Template '${name}':\n\n${JSON.stringify(template, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving template: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "validate_file",
+  {
+    title: "Validate File",
+    description: "Validate a file for processing",
+    inputSchema: {
+      filePath: z.string(),
+    },
+  },
+  async ({ filePath }) => {
+    try {
+      const validation = await fileHandler.validateFile(filePath);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `File validation result:\n\n${JSON.stringify(validation, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 // Main function to start the server
 async function main() {
   try {
@@ -4273,7 +4611,10 @@ async function main() {
     console.log("⚙️ System (3 tools):");
     console.log("- get_system_status, get_system_status_tools, run_system_status_tool");
     console.log("");
-    console.log("🎯 TOTAL: 91 COMPREHENSIVE WOOCOMMERCE TOOLS");
+    console.log("🤖 AI Document Processing (7 tools):");
+    console.log("- upload_file, search_files, process_document, list_templates, create_template, get_template, validate_file");
+    console.log("");
+    console.log("🎯 TOTAL: 98 COMPREHENSIVE WOOCOMMERCE + AI TOOLS");
     console.log("");
     console.log("📋 Environment variables:");
     console.log("- WORDPRESS_SITE_URL: Your WordPress site URL");
@@ -4281,6 +4622,11 @@ async function main() {
     console.log("- WOOCOMMERCE_CONSUMER_SECRET: WooCommerce API consumer secret");
     console.log("- WORDPRESS_USERNAME: WordPress username (for WordPress API)");
     console.log("- WORDPRESS_PASSWORD: WordPress password (for WordPress API)");
+    console.log("- VLLM_ENDPOINT: vLLM server endpoint (optional)");
+    console.log("- OPENAI_API_KEY: OpenAI API key (optional, fallback for AI)");
+    console.log("- AI_MODEL: AI model to use (default: gpt-4)");
+    console.log("- UPLOAD_DIR: Directory for file uploads (default: ./uploads)");
+    console.log("- TEMPLATE_DIR: Directory for templates (default: ./templates)");
 
   } catch (error) {
     console.error("Failed to start server:", error);

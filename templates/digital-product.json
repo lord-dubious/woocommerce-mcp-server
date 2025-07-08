@@ -1,0 +1,87 @@
+{
+  "name": "digital-product",
+  "description": "Template for digital products and downloads",
+  "version": "1.0.0",
+  "author": "WooCommerce MCP Server",
+  "created": "2025-07-08T18:09:43.643Z",
+  "updated": "2025-07-08T18:09:43.645Z",
+  "fieldMappings": [
+    {
+      "sourceField": "title",
+      "targetField": "name",
+      "transform": "none",
+      "required": true
+    },
+    {
+      "sourceField": "description",
+      "targetField": "description",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "price",
+      "targetField": "regular_price",
+      "transform": "price",
+      "required": true
+    },
+    {
+      "sourceField": "download_url",
+      "targetField": "downloads",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "file_size",
+      "targetField": "meta_data",
+      "transform": "none",
+      "defaultValue": "file_size",
+      "required": false
+    },
+    {
+      "sourceField": "format",
+      "targetField": "meta_data",
+      "transform": "none",
+      "defaultValue": "file_format",
+      "required": false
+    },
+    {
+      "sourceField": "license",
+      "targetField": "meta_data",
+      "transform": "none",
+      "defaultValue": "license_type",
+      "required": false
+    }
+  ],
+  "defaults": {
+    "type": "simple",
+    "status": "publish",
+    "catalog_visibility": "visible",
+    "manage_stock": false,
+    "stock_status": "instock",
+    "backorders": "no",
+    "sold_individually": true,
+    "reviews_allowed": true,
+    "menu_order": 0
+  },
+  "validation": {
+    "requiredFields": [
+      "name",
+      "regular_price"
+    ],
+    "uniqueFields": [],
+    "priceValidation": {
+      "minPrice": 0.99,
+      "currency": "USD"
+    }
+  },
+  "aiInstructions": {
+    "descriptionGeneration": {
+      "enabled": true,
+      "prompt": "Generate a description for this digital product highlighting its features and benefits",
+      "maxLength": 300,
+      "includeFeatures": true,
+      "includeBenefits": true,
+      "tone": "professional"
+    }
+  }
+}

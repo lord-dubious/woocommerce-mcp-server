@@ -1,0 +1,91 @@
+{
+  "name": "inventory-management",
+  "description": "Template for inventory management systems",
+  "version": "1.0.0",
+  "author": "WooCommerce MCP Server",
+  "created": "2025-07-08T18:09:43.643Z",
+  "updated": "2025-07-08T18:09:43.645Z",
+  "fieldMappings": [
+    {
+      "sourceField": "item_name",
+      "targetField": "name",
+      "transform": "none",
+      "required": true
+    },
+    {
+      "sourceField": "item_code",
+      "targetField": "sku",
+      "transform": "none",
+      "required": true
+    },
+    {
+      "sourceField": "unit_price",
+      "targetField": "regular_price",
+      "transform": "price",
+      "required": true
+    },
+    {
+      "sourceField": "quantity_on_hand",
+      "targetField": "stock_quantity",
+      "transform": "number",
+      "required": false
+    },
+    {
+      "sourceField": "item_description",
+      "targetField": "description",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "category_code",
+      "targetField": "categories",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "supplier_name",
+      "targetField": "meta_data",
+      "transform": "none",
+      "defaultValue": "supplier",
+      "required": false
+    },
+    {
+      "sourceField": "reorder_level",
+      "targetField": "meta_data",
+      "transform": "none",
+      "defaultValue": "reorder_level",
+      "required": false
+    },
+    {
+      "sourceField": "unit_weight",
+      "targetField": "weight",
+      "transform": "none",
+      "required": false
+    }
+  ],
+  "defaults": {
+    "type": "simple",
+    "status": "publish",
+    "catalog_visibility": "visible",
+    "manage_stock": true,
+    "stock_status": "instock",
+    "backorders": "notify",
+    "sold_individually": false,
+    "reviews_allowed": true,
+    "menu_order": 0
+  },
+  "validation": {
+    "requiredFields": [
+      "name",
+      "sku",
+      "regular_price"
+    ],
+    "uniqueFields": [
+      "sku"
+    ],
+    "priceValidation": {
+      "minPrice": 0,
+      "currency": "USD"
+    }
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "name": "ecommerce-csv",
+  "description": "Template for standard e-commerce CSV exports",
+  "version": "1.0.0",
+  "author": "WooCommerce MCP Server",
+  "created": "2025-07-08T18:09:43.643Z",
+  "updated": "2025-07-08T18:09:43.644Z",
+  "fieldMappings": [
+    {
+      "sourceField": "Product Name",
+      "targetField": "name",
+      "transform": "none",
+      "required": true
+    },
+    {
+      "sourceField": "Product Description",
+      "targetField": "description",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "Short Description",
+      "targetField": "short_description",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "Regular Price",
+      "targetField": "regular_price",
+      "transform": "price",
+      "required": true
+    },
+    {
+      "sourceField": "Sale Price",
+      "targetField": "sale_price",
+      "transform": "price",
+      "required": false
+    },
+    {
+      "sourceField": "SKU",
+      "targetField": "sku",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "Stock Quantity",
+      "targetField": "stock_quantity",
+      "transform": "number",
+      "required": false
+    },
+    {
+      "sourceField": "Category",
+      "targetField": "categories",
+      "transform": "array",
+      "required": false
+    },
+    {
+      "sourceField": "Tags",
+      "targetField": "tags",
+      "transform": "array",
+      "required": false
+    },
+    {
+      "sourceField": "Image URL",
+      "targetField": "images",
+      "transform": "array",
+      "required": false
+    },
+    {
+      "sourceField": "Weight",
+      "targetField": "weight",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "Length",
+      "targetField": "dimensions.length",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "Width",
+      "targetField": "dimensions.width",
+      "transform": "none",
+      "required": false
+    },
+    {
+      "sourceField": "Height",
+      "targetField": "dimensions.height",
+      "transform": "none",
+      "required": false
+    }
+  ],
+  "categoryMappings": [
+    {
+      "sourceValue": "Electronics",
+      "categoryId": 1,
+      "categoryName": "Electronics"
+    },
+    {
+      "sourceValue": "Clothing",
+      "categoryId": 2,
+      "categoryName": "Clothing"
+    },
+    {
+      "sourceValue": "Books",
+      "categoryId": 3,
+      "categoryName": "Books"
+    },
+    {
+      "sourceValue": "Home & Garden",
+      "categoryId": 4,
+      "categoryName": "Home & Garden"
+    }
+  ],
+  "tagMappings": [
+    {
+      "sourceField": "Tags",
+      "separator": ",",
+      "transform": "lowercase"
+    }
+  ],
+  "imageProcessing": {
+    "sourceField": "Image URL",
+    "resize": {
+      "width": 800,
+      "height": 800
+    },
+    "quality": 85,
+    "format": "jpeg"
+  },
+  "validation": {
+    "requiredFields": [
+      "name",
+      "regular_price"
+    ],
+    "uniqueFields": [
+      "sku"
+    ],
+    "priceValidation": {
+      "minPrice": 0.01,
+      "maxPrice": 10000,
+      "currency": "USD"
+    }
+  },
+  "aiInstructions": {
+    "descriptionGeneration": {
+      "enabled": true,
+      "prompt": "Generate a compelling product description based on the product name and features",
+      "maxLength": 500,
+      "includeFeatures": true,
+      "includeBenefits": true,
+      "tone": "professional"
+    },
+    "seoOptimization": {
+      "enabled": true,
+      "generateMetaTitle": true,
+      "generateMetaDescription": true,
+      "generateKeywords": true
+    },
+    "categoryPrediction": {
+      "enabled": true,
+      "confidence": 0.8,
+      "maxCategories": 2
+    }
+  }
+}
