@@ -10,19 +10,30 @@ import { OpenAI } from 'openai';
 import sharp from 'sharp';
 import mime from 'mime-types';
 import { z } from 'zod';
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage } from '@langchain/core/messages';
+import { Document } from '@langchain/core/documents';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+import { TextLoader } from 'langchain/document_loaders/fs/text';
 
 // Document processing schemas
 export const DocumentProcessingConfigSchema = z.object({
   openaiApiKey: z.string().optional(),
   openaiBaseUrl: z.string().url().optional(), // Support for custom OpenAI-compatible endpoints
-  model: z.string().default('gpt-4-vision-preview'), // Default to vision model
-  visionModel: z.string().default('gpt-4-vision-preview'), // Specific vision model for image processing
+  model: z.string().default('gpt-4-vision-preview'), // Default vision language model
+  visionModel: z.string().default('gpt-4-vision-preview'), // Vision language model for image processing
   textModel: z.string().default('gpt-4'), // Text-only model for non-vision tasks
   maxTokens: z.number().default(4000),
   temperature: z.number().min(0).max(2).default(0.7),
   uploadDir: z.string().default('./uploads'),
   templateDir: z.string().default('./templates'),
-  supportedImageFormats: z.array(z.string()).default(['jpg', 'jpeg', 'png', 'gif', 'webp']),
+  supportedImageFormats: z.array(z.string()).default(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff']),
+  enableClientVisionDetection: z.boolean().default(true), // Detect if client supports vision
+  useLangChain: z.boolean().default(true), // Use LangChain for document processing
+  chunkSize: z.number().default(1000), // LangChain text splitting chunk size
+  chunkOverlap: z.number().default(200), // LangChain text splitting overlap
 });
 
 export const ProductTemplateSchema = z.object({
@@ -57,6 +68,11 @@ export const DocumentProcessingRequestSchema = z.object({
   customPrompt: z.string().optional(),
   batchSize: z.number().min(1).max(100).default(10),
   validateOnly: z.boolean().default(false),
+  clientCapabilities: z.object({
+    supportsVision: z.boolean().default(false),
+    visionModels: z.array(z.string()).default([]),
+    preferClientVision: z.boolean().default(false),
+  }).optional(),
 });
 
 export interface ProcessingResult {
@@ -71,28 +87,58 @@ export interface ProcessingResult {
     failed: number;
     skipped: number;
   };
+  processingInfo?: {
+    processedBy: string;
+    visionModel?: string;
+    textModel?: string;
+    chunks?: number;
+    reason?: string;
+    instruction?: string;
+    suggestedPrompt?: string;
+  };
 }
 
 export class DocumentProcessor {
   private config: z.infer<typeof DocumentProcessingConfigSchema>;
   private openai?: OpenAI;
+  private langchainModel?: ChatOpenAI;
+  private textSplitter: RecursiveCharacterTextSplitter;
 
   constructor(config: z.infer<typeof DocumentProcessingConfigSchema>) {
     this.config = DocumentProcessingConfigSchema.parse(config);
 
-    // Initialize OpenAI client with vision support
+    // Initialize OpenAI client for vision language models
     if (this.config.openaiApiKey) {
       const clientConfig: any = {
         apiKey: this.config.openaiApiKey,
       };
 
-      // Support for custom OpenAI-compatible endpoints (like local models)
+      // Support for custom OpenAI-compatible endpoints (like local vision models)
       if (this.config.openaiBaseUrl) {
         clientConfig.baseURL = this.config.openaiBaseUrl;
       }
 
       this.openai = new OpenAI(clientConfig);
+
+      // Initialize LangChain model for document processing
+      if (this.config.useLangChain) {
+        this.langchainModel = new ChatOpenAI({
+          openAIApiKey: this.config.openaiApiKey,
+          modelName: this.config.textModel,
+          temperature: this.config.temperature,
+          maxTokens: this.config.maxTokens,
+          ...(this.config.openaiBaseUrl && {
+            configuration: { baseURL: this.config.openaiBaseUrl }
+          }),
+        });
+      }
     }
+
+    // Initialize text splitter for LangChain document processing
+    this.textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: this.config.chunkSize,
+      chunkOverlap: this.config.chunkOverlap,
+    });
 
     // Ensure directories exist
     this.ensureDirectories();
@@ -102,6 +148,33 @@ export class DocumentProcessor {
   private isImageFile(filePath: string): boolean {
     const extension = path.extname(filePath).toLowerCase().replace('.', '');
     return this.config.supportedImageFormats.includes(extension);
+  }
+
+  // Detect client vision capabilities and determine processing strategy
+  private shouldUseClientVision(clientCapabilities?: any): { useClient: boolean; reason: string } {
+    if (!this.config.enableClientVisionDetection) {
+      return { useClient: false, reason: 'Client vision detection disabled' };
+    }
+
+    if (!clientCapabilities) {
+      return { useClient: false, reason: 'No client capabilities provided' };
+    }
+
+    if (clientCapabilities.preferClientVision && clientCapabilities.supportsVision) {
+      return {
+        useClient: true,
+        reason: `Client prefers local vision processing with models: ${clientCapabilities.visionModels?.join(', ') || 'default'}`
+      };
+    }
+
+    if (clientCapabilities.supportsVision && clientCapabilities.visionModels?.length > 0) {
+      return {
+        useClient: true,
+        reason: `Client supports vision models: ${clientCapabilities.visionModels.join(', ')}`
+      };
+    }
+
+    return { useClient: false, reason: 'Client does not support vision processing' };
   }
 
   // Convert image to base64 for vision model processing
@@ -116,24 +189,52 @@ export class DocumentProcessor {
     }
   }
 
-  // Process images using vision models
-  private async processImageWithVision(filePath: string, customPrompt?: string): Promise<string> {
+  // Process images using vision language models
+  private async processImageWithVision(
+    filePath: string,
+    customPrompt?: string,
+    clientCapabilities?: any
+  ): Promise<{ content: string; processedBy: string; reason: string }> {
+
+    // Check if client should handle vision processing
+    const visionStrategy = this.shouldUseClientVision(clientCapabilities);
+
+    if (visionStrategy.useClient) {
+      return {
+        content: `CLIENT_VISION_PROCESSING_REQUIRED: ${filePath}`,
+        processedBy: 'client',
+        reason: visionStrategy.reason
+      };
+    }
+
+    // Server-side vision processing with OpenAI-compatible endpoint
     if (!this.openai) {
-      throw new Error('OpenAI client not configured. Please set OPENAI_API_KEY environment variable.');
+      throw new Error(`Vision language model not configured.
+
+🤖 Configuration Required:
+- Set OPENAI_API_KEY for vision model access
+- Optionally set OPENAI_BASE_URL for custom vision model endpoints
+- Ensure vision model (${this.config.visionModel}) is available
+
+💡 Alternative: Client can handle vision processing if it supports vision models.`);
     }
 
     const base64Image = await this.imageToBase64(filePath);
     const prompt = customPrompt || `
-      Analyze this image and extract any product information you can find.
-      Look for:
+      Analyze this image using vision language model capabilities and extract product information:
+
+      🎯 Extract:
       - Product names and titles
       - Prices and pricing information
       - Product descriptions and features
       - Categories and classifications
       - SKUs or product codes
-      - Any other relevant product data
+      - Specifications and technical details
+      - Brand information
+      - Any other relevant e-commerce data
 
-      Format the response as structured data that can be used to create WooCommerce products.
+      📋 Format the response as structured JSON data suitable for WooCommerce product creation.
+      Focus on accuracy and completeness for e-commerce applications.
     `;
 
     const response = await this.openai.chat.completions.create({
@@ -151,7 +252,11 @@ export class DocumentProcessor {
       temperature: this.config.temperature,
     });
 
-    return response.choices[0]?.message?.content || '';
+    return {
+      content: response.choices[0]?.message?.content || '',
+      processedBy: 'server',
+      reason: `Processed by server vision model: ${this.config.visionModel}`
+    };
   }
 
   private ensureDirectories() {
@@ -160,6 +265,94 @@ export class DocumentProcessor {
         fs.mkdirSync(dir, { recursive: true });
       }
     });
+  }
+
+  // LangChain-based document processing for better text handling
+  private async processDocumentWithLangChain(filePath: string, fileType: string): Promise<Document[]> {
+    let loader;
+
+    switch (fileType) {
+      case 'pdf':
+        loader = new PDFLoader(filePath);
+        break;
+      case 'docx':
+        loader = new DocxLoader(filePath);
+        break;
+      case 'txt':
+        loader = new TextLoader(filePath);
+        break;
+      default:
+        // For other formats, create a document from the content
+        const content = await this.getFileContent(filePath, fileType);
+        return [new Document({
+          pageContent: typeof content === 'string' ? content : JSON.stringify(content),
+          metadata: { source: filePath, type: fileType }
+        })];
+    }
+
+    const docs = await loader.load();
+    return docs;
+  }
+
+  // Get file content for various formats
+  private async getFileContent(filePath: string, fileType: string): Promise<any> {
+    switch (fileType) {
+      case 'csv':
+        return await this.processCSV(filePath);
+      case 'xlsx':
+        return await this.processExcel(filePath);
+      case 'json':
+        return await this.processJSON(filePath);
+      default:
+        return fs.readFileSync(filePath, 'utf-8');
+    }
+  }
+
+  // Enhanced document processing with LangChain text splitting
+  private async processLargeDocument(docs: Document[], customPrompt?: string): Promise<string> {
+    if (!this.langchainModel) {
+      throw new Error('LangChain model not configured. Please set OPENAI_API_KEY.');
+    }
+
+    // Split documents into chunks for better processing
+    const splitDocs = await this.textSplitter.splitDocuments(docs);
+
+    const prompt = customPrompt || `
+      Analyze this document content and extract relevant information for e-commerce product creation.
+      Focus on identifying products, prices, descriptions, categories, and specifications.
+      Provide structured data that can be used for WooCommerce product imports.
+    `;
+
+    const results = [];
+
+    // Process chunks in batches to avoid token limits
+    for (const doc of splitDocs.slice(0, 5)) { // Limit to first 5 chunks for efficiency
+      const message = new HumanMessage(`${prompt}\n\nDocument content:\n${doc.pageContent}`);
+      const response = await this.langchainModel.invoke([message]);
+      results.push(response.content);
+    }
+
+    return results.join('\n\n---\n\n');
+  }
+
+  // Fallback processing for when LangChain is not available or fails
+  private async fallbackProcessing(filePath: string, fileType: string): Promise<any> {
+    switch (fileType) {
+      case 'csv':
+        return await this.processCSV(filePath);
+      case 'xlsx':
+        return await this.processExcel(filePath);
+      case 'pdf':
+        return await this.processPDF(filePath);
+      case 'docx':
+        return await this.processDocx(filePath);
+      case 'txt':
+        return await this.processText(filePath);
+      case 'json':
+        return await this.processJSON(filePath);
+      default:
+        throw new Error(`Unsupported file type: ${fileType}`);
+    }
   }
 
   async processDocument(request: z.infer<typeof DocumentProcessingRequestSchema>): Promise<ProcessingResult> {
@@ -174,40 +367,68 @@ export class DocumentProcessor {
         };
       }
 
-      // Check if it's an image file and use vision processing
+      // Check if it's an image file and handle vision processing
       let extractedData: any;
+      let processingInfo: any = {};
+
       if (this.isImageFile(validatedRequest.filePath)) {
-        // Use vision model for image processing
-        extractedData = await this.processImageWithVision(
+        // Handle vision language model processing
+        const visionResult = await this.processImageWithVision(
           validatedRequest.filePath,
-          validatedRequest.customPrompt
+          validatedRequest.customPrompt,
+          validatedRequest.clientCapabilities
         );
+
+        if (visionResult.processedBy === 'client') {
+          // Return instruction for client to handle vision processing
+          return {
+            success: true,
+            message: 'Client vision processing required',
+            data: visionResult.content,
+            processingInfo: {
+              processedBy: 'client',
+              reason: visionResult.reason,
+              instruction: 'Please process this image using your local vision capabilities',
+              suggestedPrompt: validatedRequest.customPrompt || 'Extract product information from this image'
+            }
+          };
+        } else {
+          extractedData = visionResult.content;
+          processingInfo = {
+            processedBy: 'server',
+            visionModel: this.config.visionModel,
+            reason: visionResult.reason
+          };
+        }
       } else {
-        // Process based on file type for non-image files
-        switch (validatedRequest.fileType) {
-          case 'csv':
-            extractedData = await this.processCSV(validatedRequest.filePath);
-            break;
-          case 'xlsx':
-            extractedData = await this.processExcel(validatedRequest.filePath);
-            break;
-          case 'pdf':
-            extractedData = await this.processPDF(validatedRequest.filePath);
-            break;
-          case 'docx':
-            extractedData = await this.processDocx(validatedRequest.filePath);
-            break;
-          case 'txt':
-            extractedData = await this.processText(validatedRequest.filePath);
-            break;
-          case 'json':
-            extractedData = await this.processJSON(validatedRequest.filePath);
-            break;
-          default:
-            return {
-              success: false,
-              message: `Unsupported file type: ${validatedRequest.fileType}`,
+        // Use LangChain for document processing when available
+        if (this.config.useLangChain && ['pdf', 'docx', 'txt'].includes(validatedRequest.fileType)) {
+          try {
+            const docs = await this.processDocumentWithLangChain(
+              validatedRequest.filePath,
+              validatedRequest.fileType
+            );
+            extractedData = await this.processLargeDocument(docs, validatedRequest.customPrompt);
+            processingInfo = {
+              processedBy: 'langchain',
+              chunks: docs.length,
+              textModel: this.config.textModel
             };
+          } catch (error) {
+            // Fallback to traditional processing
+            extractedData = await this.fallbackProcessing(validatedRequest.filePath, validatedRequest.fileType);
+            processingInfo = {
+              processedBy: 'fallback',
+              reason: `LangChain failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            };
+          }
+        } else {
+          // Traditional processing for other file types
+          extractedData = await this.fallbackProcessing(validatedRequest.filePath, validatedRequest.fileType);
+          processingInfo = {
+            processedBy: 'traditional',
+            fileType: validatedRequest.fileType
+          };
         }
       }
 
@@ -218,6 +439,7 @@ export class DocumentProcessor {
             success: true,
             message: 'Data extracted successfully',
             data: extractedData,
+            processingInfo,
           };
         
         case 'analyze':
@@ -455,7 +677,8 @@ Current request: ${useVision ? 'Vision model processing' : 'Text model processin
     try {
       if (useVision && imagePath) {
         // Use vision model for image processing
-        return await this.processImageWithVision(imagePath, prompt);
+        const visionResult = await this.processImageWithVision(imagePath, prompt);
+        return visionResult.content;
       } else {
         // Use text model for regular processing
         const response = await this.openai.chat.completions.create({

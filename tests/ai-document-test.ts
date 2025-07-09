@@ -22,6 +22,10 @@ async function testAIDocumentProcessing() {
     uploadDir: './uploads',
     templateDir: './templates',
     supportedImageFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    enableClientVisionDetection: true,
+    useLangChain: true,
+    chunkSize: 1000,
+    chunkOverlap: 200,
   });
 
   const templateManager = new TemplateManager('./templates');

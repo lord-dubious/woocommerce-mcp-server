@@ -409,11 +409,11 @@ async function deleteEntityMeta(client: any, entityType: string, entityId: numbe
   });
 }
 
-// Initialize document processing components with vision model support
+// Initialize document processing components with LangChain and vision language model support
 const documentProcessor = new DocumentProcessor({
-  openaiApiKey: process.env.OPENAI_API_KEY || GLOBAL_CREDENTIALS.consumerKey, // Fallback to any available key
+  openaiApiKey: process.env.OPENAI_API_KEY,
   openaiBaseUrl: process.env.OPENAI_BASE_URL, // Support for custom OpenAI-compatible endpoints
-  model: process.env.AI_MODEL || 'gpt-4-vision-preview', // Default to vision model
+  model: process.env.AI_MODEL || 'gpt-4-vision-preview', // Default vision language model
   visionModel: process.env.AI_VISION_MODEL || 'gpt-4-vision-preview',
   textModel: process.env.AI_TEXT_MODEL || 'gpt-4',
   maxTokens: parseInt(process.env.AI_MAX_TOKENS || '4000'),
@@ -421,6 +421,10 @@ const documentProcessor = new DocumentProcessor({
   uploadDir: process.env.UPLOAD_DIR || './uploads',
   templateDir: process.env.TEMPLATE_DIR || './templates',
   supportedImageFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'],
+  enableClientVisionDetection: process.env.ENABLE_CLIENT_VISION_DETECTION !== 'false',
+  useLangChain: process.env.USE_LANGCHAIN !== 'false',
+  chunkSize: parseInt(process.env.LANGCHAIN_CHUNK_SIZE || '1000'),
+  chunkOverlap: parseInt(process.env.LANGCHAIN_CHUNK_OVERLAP || '200'),
 });
 
 const templateManager = new TemplateManager(process.env.TEMPLATE_DIR || './templates');
@@ -4388,7 +4392,7 @@ server.registerTool(
   "process_document",
   {
     title: "Process Document",
-    description: "Process documents and images (CSV, Excel, PDF, images, etc.) for product creation using AI with vision model support",
+    description: "Process documents and images using LangChain and vision language models with intelligent client capability detection",
     inputSchema: {
       credentials: WooCommerceCredentialsSchema.optional(),
       filePath: z.string(),
@@ -4398,10 +4402,14 @@ server.registerTool(
       customPrompt: z.string().optional(),
       batchSize: z.number().min(1).max(100).default(10),
       validateOnly: z.boolean().default(false),
-      useVision: z.boolean().default(false),
+      clientCapabilities: z.object({
+        supportsVision: z.boolean().default(false),
+        visionModels: z.array(z.string()).default([]),
+        preferClientVision: z.boolean().default(false),
+      }).optional(),
     },
   },
-  async ({ filePath, fileType, processingMode, template, customPrompt, batchSize = 10, validateOnly = false }) => {
+  async ({ filePath, fileType, processingMode, template, customPrompt, batchSize = 10, validateOnly = false, clientCapabilities }) => {
     try {
       const result = await documentProcessor.processDocument({
         filePath,
@@ -4411,6 +4419,7 @@ server.registerTool(
         customPrompt,
         batchSize,
         validateOnly,
+        clientCapabilities,
       });
 
       if (!result.success) {
@@ -4425,21 +4434,70 @@ server.registerTool(
         };
       }
 
-      let responseText = `Processing completed: ${result.message}`;
+      // Handle client vision processing instructions
+      if (result.processingInfo?.processedBy === 'client') {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `🤖 Client Vision Processing Required
+
+📋 Your client supports vision capabilities! For better performance and privacy, please process this image locally.
+
+📄 File: ${filePath}
+🎯 Task: ${result.processingInfo.instruction || 'Process image with vision model'}
+💡 Reason: ${result.processingInfo.reason}
+
+🔧 Suggested Prompt:
+"${result.processingInfo.suggestedPrompt || 'Extract product information from this image'}"
+
+✨ Benefits of client-side processing:
+- Better privacy (data stays local)
+- Faster processing (no network transfer)
+- Use of your preferred vision models`,
+            },
+          ],
+        };
+      }
+
+      let responseText = `🤖 Document Processing Complete\n${'='.repeat(40)}\n\n`;
+      responseText += `📄 File: ${filePath}\n`;
+      responseText += `📋 Type: ${fileType}\n`;
+      responseText += `🔧 Mode: ${processingMode}\n`;
+      responseText += `✅ Status: ${result.message}\n`;
+      if (template) responseText += `📝 Template: ${template}\n`;
+
+      // Add processing information
+      if (result.processingInfo) {
+        responseText += `\n🔍 Processing Details:\n`;
+        responseText += `- Method: ${result.processingInfo.processedBy}\n`;
+        if (result.processingInfo.visionModel) {
+          responseText += `- Vision model: ${result.processingInfo.visionModel}\n`;
+        }
+        if (result.processingInfo.textModel) {
+          responseText += `- Text model: ${result.processingInfo.textModel}\n`;
+        }
+        if (result.processingInfo.chunks) {
+          responseText += `- Document chunks: ${result.processingInfo.chunks}\n`;
+        }
+        if (result.processingInfo.reason) {
+          responseText += `- Details: ${result.processingInfo.reason}\n`;
+        }
+      }
 
       if (result.products && result.products.length > 0) {
-        responseText += `\n\nGenerated ${result.products.length} products`;
+        responseText += `\n\n🏭 Generated Products: ${result.products.length}`;
         if (result.stats) {
-          responseText += `\nStats: ${JSON.stringify(result.stats, null, 2)}`;
+          responseText += `\n📊 Stats: ${JSON.stringify(result.stats, null, 2)}`;
         }
       }
 
       if (result.data) {
-        responseText += `\n\nData: ${JSON.stringify(result.data, null, 2)}`;
+        responseText += `\n\n📊 Extracted Data:\n${typeof result.data === 'string' ? result.data.substring(0, 500) + (result.data.length > 500 ? '...' : '') : JSON.stringify(result.data, null, 2)}`;
       }
 
       if (result.errors && result.errors.length > 0) {
-        responseText += `\n\nErrors: ${result.errors.join(', ')}`;
+        responseText += `\n\n❌ Errors: ${result.errors.join(', ')}`;
       }
 
       return {
@@ -5454,12 +5512,18 @@ async function main() {
     console.log("- WORDPRESS_USERNAME: WordPress username (for content management)");
     console.log("- WORDPRESS_PASSWORD: WordPress password (for content management)");
     console.log("");
-    console.log("🤖 AI & Vision Models:");
+    console.log("🤖 AI & Vision Language Models:");
     console.log("- OPENAI_API_KEY: OpenAI API key (required for AI features)");
     console.log("- OPENAI_BASE_URL: Custom OpenAI-compatible endpoint (optional)");
     console.log("- AI_MODEL: Default AI model (default: gpt-4-vision-preview)");
-    console.log("- AI_VISION_MODEL: Vision model for images (default: gpt-4-vision-preview)");
+    console.log("- AI_VISION_MODEL: Vision language model for images (default: gpt-4-vision-preview)");
     console.log("- AI_TEXT_MODEL: Text model for documents (default: gpt-4)");
+    console.log("");
+    console.log("📚 LangChain Configuration:");
+    console.log("- USE_LANGCHAIN: Enable LangChain document processing (default: true)");
+    console.log("- LANGCHAIN_CHUNK_SIZE: Text splitting chunk size (default: 1000)");
+    console.log("- LANGCHAIN_CHUNK_OVERLAP: Text splitting overlap (default: 200)");
+    console.log("- ENABLE_CLIENT_VISION_DETECTION: Detect client vision capabilities (default: true)");
     console.log("");
     console.log("📁 File Processing:");
     console.log("- UPLOAD_DIR: Directory for file uploads (default: ./uploads)");
