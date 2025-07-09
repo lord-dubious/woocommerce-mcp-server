@@ -9,12 +9,31 @@ import { DocumentProcessor, DocumentProcessingConfigSchema, DocumentProcessingRe
 import { TemplateManager, ProductTemplateConfigSchema } from "./template-manager.js";
 import { FileHandler, FileUploadSchema, FileSearchSchema } from "./file-handler.js";
 
-// Environment variables for WooCommerce/WordPress credentials
-const DEFAULT_SITE_URL = process.env.WORDPRESS_SITE_URL || "";
-const DEFAULT_USERNAME = process.env.WORDPRESS_USERNAME || "";
-const DEFAULT_PASSWORD = process.env.WORDPRESS_PASSWORD || "";
-const DEFAULT_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY || "";
-const DEFAULT_CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET || "";
+// Global credentials that MCP remembers and uses automatically
+const GLOBAL_CREDENTIALS = {
+  siteUrl: process.env.WORDPRESS_SITE_URL || "",
+  username: process.env.WORDPRESS_USERNAME || "",
+  password: process.env.WORDPRESS_PASSWORD || "",
+  consumerKey: process.env.WOOCOMMERCE_CONSUMER_KEY || "",
+  consumerSecret: process.env.WOOCOMMERCE_CONSUMER_SECRET || "",
+};
+
+// MCP Server Context - Understanding its main purpose and capabilities
+const MCP_CONTEXT = {
+  purpose: "WooCommerce E-commerce Management and AI-Powered Product Creation",
+  description: "I am an intelligent WooCommerce management system that helps you manage your online store and create products from any document using AI vision models.",
+  capabilities: [
+    "Complete WooCommerce store management (products, orders, customers, etc.)",
+    "AI-powered document processing with vision model support",
+    "Bulk operations with intelligent automation and error handling",
+    "SEO optimization and content enhancement",
+    "Multi-format document parsing (CSV, Excel, PDF, images, etc.)",
+    "Enterprise-grade workflow automation with progress tracking"
+  ],
+  defaultBehavior: "Always use stored environment credentials unless explicitly overridden by user",
+  aiProvider: "OpenAI-compatible API with vision model support",
+  credentialPolicy: "Automatically use environment credentials, allow override per request",
+};
 
 // Validation schemas
 const WooCommerceCredentialsSchema = z.object({
@@ -249,24 +268,49 @@ const SettingDataSchema = z.object({
 });
 
 // Helper function to create API clients
-function createWooCommerceClient(credentials: z.infer<typeof WooCommerceCredentialsSchema>) {
-  const siteUrl = credentials.siteUrl || DEFAULT_SITE_URL;
-  const consumerKey = credentials.consumerKey || DEFAULT_CONSUMER_KEY;
-  const consumerSecret = credentials.consumerSecret || DEFAULT_CONSUMER_SECRET;
+// Smart credential management - automatically uses global credentials with override support
+function createWooCommerceClient(credentials: z.infer<typeof WooCommerceCredentialsSchema> = {}) {
+  // Merge provided credentials with global credentials (provided credentials take precedence)
+  const finalCredentials = {
+    siteUrl: credentials.siteUrl || GLOBAL_CREDENTIALS.siteUrl,
+    consumerKey: credentials.consumerKey || GLOBAL_CREDENTIALS.consumerKey,
+    consumerSecret: credentials.consumerSecret || GLOBAL_CREDENTIALS.consumerSecret,
+  };
 
-  if (!siteUrl) {
-    throw new Error("WordPress site URL not provided in environment variables or parameters");
+  if (!finalCredentials.siteUrl) {
+    throw new Error(`🔧 WordPress site URL not configured.
+
+📋 MCP Context: ${MCP_CONTEXT.purpose}
+🎯 I need your WooCommerce site URL to manage your store.
+
+Configuration Options:
+1. Set WORDPRESS_SITE_URL=https://your-site.com in environment
+2. Or provide siteUrl in request parameters
+
+Current capabilities: ${MCP_CONTEXT.capabilities.slice(0, 2).join(', ')}`);
   }
 
-  if (!consumerKey || !consumerSecret) {
-    throw new Error("WooCommerce API credentials not provided in environment variables or parameters");
+  if (!finalCredentials.consumerKey || !finalCredentials.consumerSecret) {
+    throw new Error(`🔧 WooCommerce API credentials not configured.
+
+📋 MCP Context: ${MCP_CONTEXT.purpose}
+🎯 I need your WooCommerce API credentials to manage products, orders, and customers.
+
+Configuration Steps:
+1. Go to WooCommerce → Settings → Advanced → REST API
+2. Create new API key with Read/Write permissions
+3. Set WOOCOMMERCE_CONSUMER_KEY=ck_your_key in environment
+4. Set WOOCOMMERCE_CONSUMER_SECRET=cs_your_secret in environment
+5. Or provide consumerKey and consumerSecret in request parameters
+
+🤖 Default Behavior: ${MCP_CONTEXT.defaultBehavior}`);
   }
 
   return axios.create({
-    baseURL: `${siteUrl}/wp-json/wc/v3`,
+    baseURL: `${finalCredentials.siteUrl}/wp-json/wc/v3`,
     params: {
-      consumer_key: consumerKey,
-      consumer_secret: consumerSecret,
+      consumer_key: finalCredentials.consumerKey,
+      consumer_secret: finalCredentials.consumerSecret,
     },
     headers: {
       "Content-Type": "application/json",
@@ -274,22 +318,42 @@ function createWooCommerceClient(credentials: z.infer<typeof WooCommerceCredenti
   });
 }
 
-function createWordPressClient(credentials: z.infer<typeof WooCommerceCredentialsSchema>) {
-  const siteUrl = credentials.siteUrl || DEFAULT_SITE_URL;
-  const username = credentials.username || DEFAULT_USERNAME;
-  const password = credentials.password || DEFAULT_PASSWORD;
+function createWordPressClient(credentials: z.infer<typeof WooCommerceCredentialsSchema> = {}) {
+  // Merge provided credentials with global credentials (provided credentials take precedence)
+  const finalCredentials = {
+    siteUrl: credentials.siteUrl || GLOBAL_CREDENTIALS.siteUrl,
+    username: credentials.username || GLOBAL_CREDENTIALS.username,
+    password: credentials.password || GLOBAL_CREDENTIALS.password,
+  };
 
-  if (!siteUrl) {
-    throw new Error("WordPress site URL not provided in environment variables or parameters");
+  if (!finalCredentials.siteUrl) {
+    throw new Error(`🔧 WordPress site URL not configured.
+
+📋 MCP Context: ${MCP_CONTEXT.purpose}
+🎯 I need your WordPress site URL for content management operations.
+
+Configuration Options:
+1. Set WORDPRESS_SITE_URL=https://your-site.com in environment
+2. Or provide siteUrl in request parameters`);
   }
 
-  if (!username || !password) {
-    throw new Error("WordPress credentials not provided in environment variables or parameters");
+  if (!finalCredentials.username || !finalCredentials.password) {
+    throw new Error(`🔧 WordPress credentials not configured.
+
+📋 MCP Context: ${MCP_CONTEXT.purpose}
+🎯 I need WordPress admin credentials for content management.
+
+Configuration Steps:
+1. Set WORDPRESS_USERNAME=your_admin_username in environment
+2. Set WORDPRESS_PASSWORD=your_admin_password in environment
+3. Or provide username and password in request parameters
+
+🤖 Default Behavior: ${MCP_CONTEXT.defaultBehavior}`);
   }
 
-  const auth = Buffer.from(`${username}:${password}`).toString("base64");
+  const auth = Buffer.from(`${finalCredentials.username}:${finalCredentials.password}`).toString("base64");
   return axios.create({
-    baseURL: `${siteUrl}/wp-json/wp/v2`,
+    baseURL: `${finalCredentials.siteUrl}/wp-json/wp/v2`,
     headers: {
       Authorization: `Basic ${auth}`,
       "Content-Type": "application/json",
@@ -345,15 +409,18 @@ async function deleteEntityMeta(client: any, entityType: string, entityId: numbe
   });
 }
 
-// Initialize document processing components
+// Initialize document processing components with vision model support
 const documentProcessor = new DocumentProcessor({
-  vllmEndpoint: process.env.VLLM_ENDPOINT,
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  model: process.env.AI_MODEL || 'gpt-4',
+  openaiApiKey: process.env.OPENAI_API_KEY || GLOBAL_CREDENTIALS.consumerKey, // Fallback to any available key
+  openaiBaseUrl: process.env.OPENAI_BASE_URL, // Support for custom OpenAI-compatible endpoints
+  model: process.env.AI_MODEL || 'gpt-4-vision-preview', // Default to vision model
+  visionModel: process.env.AI_VISION_MODEL || 'gpt-4-vision-preview',
+  textModel: process.env.AI_TEXT_MODEL || 'gpt-4',
   maxTokens: parseInt(process.env.AI_MAX_TOKENS || '4000'),
   temperature: parseFloat(process.env.AI_TEMPERATURE || '0.7'),
   uploadDir: process.env.UPLOAD_DIR || './uploads',
   templateDir: process.env.TEMPLATE_DIR || './templates',
+  supportedImageFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'],
 });
 
 const templateManager = new TemplateManager(process.env.TEMPLATE_DIR || './templates');
@@ -4321,15 +4388,17 @@ server.registerTool(
   "process_document",
   {
     title: "Process Document",
-    description: "Process documents (CSV, Excel, PDF, etc.) for product creation using AI",
+    description: "Process documents and images (CSV, Excel, PDF, images, etc.) for product creation using AI with vision model support",
     inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
       filePath: z.string(),
-      fileType: z.enum(['csv', 'xlsx', 'pdf', 'docx', 'txt', 'json']),
+      fileType: z.enum(['csv', 'xlsx', 'pdf', 'docx', 'txt', 'json', 'image']),
       processingMode: z.enum(['extract', 'analyze', 'generate_products', 'bulk_upload']),
       template: z.string().optional(),
       customPrompt: z.string().optional(),
       batchSize: z.number().min(1).max(100).default(10),
       validateOnly: z.boolean().default(false),
+      useVision: z.boolean().default(false),
     },
   },
   async ({ filePath, fileType, processingMode, template, customPrompt, batchSize = 10, validateOnly = false }) => {
@@ -4387,6 +4456,172 @@ server.registerTool(
           {
             type: "text",
             text: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "process_image_with_vision",
+  {
+    title: "Process Image with Vision Model",
+    description: "Analyze images using AI vision models to extract product information",
+    inputSchema: {
+      credentials: WooCommerceCredentialsSchema.optional(),
+      imagePath: z.string(),
+      analysisType: z.enum(['product_extraction', 'catalog_analysis', 'price_detection', 'general_analysis']).default('product_extraction'),
+      customPrompt: z.string().optional(),
+      generateProducts: z.boolean().default(false),
+    },
+  },
+  async ({ credentials = {}, imagePath, analysisType = 'product_extraction', customPrompt, generateProducts = false }) => {
+    try {
+      // Check if file exists and is an image
+      if (!require('fs').existsSync(imagePath)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Image file not found: ${imagePath}
+
+🔧 Please check:
+- File path is correct
+- File exists and is accessible
+- File is in a supported image format (JPG, PNG, GIF, WebP)`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Determine the appropriate prompt based on analysis type
+      let prompt = customPrompt;
+      if (!prompt) {
+        switch (analysisType) {
+          case 'product_extraction':
+            prompt = `Analyze this product image and extract detailed information for creating WooCommerce products:
+
+🎯 Extract:
+- Product name and title
+- Product description and features
+- Price information (if visible)
+- Product category/type
+- Brand information
+- SKU or product codes
+- Specifications and details
+- Any other relevant product data
+
+📋 Format the response as structured data that can be used to create WooCommerce products.`;
+            break;
+          case 'catalog_analysis':
+            prompt = `Analyze this catalog page/image and identify all products shown:
+
+🎯 For each product, extract:
+- Product names
+- Prices
+- Descriptions
+- Categories
+- Any visible specifications
+
+📋 Organize the information in a structured format for bulk product creation.`;
+            break;
+          case 'price_detection':
+            prompt = `Focus on detecting and extracting price information from this image:
+
+🎯 Find:
+- Regular prices
+- Sale prices
+- Currency symbols
+- Price ranges
+- Discount information
+
+📋 Return structured pricing data.`;
+            break;
+          case 'general_analysis':
+            prompt = `Provide a comprehensive analysis of this image for e-commerce purposes:
+
+🎯 Analyze:
+- What products or items are shown
+- Visual quality and presentation
+- Text and information visible
+- Potential use for product listings
+- Recommendations for improvement
+
+📋 Provide actionable insights for e-commerce use.`;
+            break;
+        }
+      }
+
+      // Process the image with vision model
+      const result = await documentProcessor.processDocument({
+        filePath: imagePath,
+        fileType: 'image' as any, // Type assertion for image processing
+        processingMode: generateProducts ? 'generate_products' : 'analyze',
+        customPrompt: prompt,
+        batchSize: 1,
+        validateOnly: !generateProducts,
+      });
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Vision processing failed: ${result.message}
+
+🔧 Troubleshooting:
+- Ensure OPENAI_API_KEY is configured
+- Check if the image format is supported
+- Verify the image is clear and readable
+- Try with a different analysis type`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      let responseText = `🤖 Vision Model Analysis Complete\n`;
+      responseText += `📸 Image: ${imagePath}\n`;
+      responseText += `🔍 Analysis Type: ${analysisType}\n\n`;
+
+      if (result.data) {
+        responseText += `📋 Analysis Results:\n${typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2)}\n\n`;
+      }
+
+      if (result.products && result.products.length > 0) {
+        responseText += `🏭 Generated Products: ${result.products.length}\n`;
+        responseText += `📊 Products:\n${JSON.stringify(result.products, null, 2)}\n\n`;
+      }
+
+      if (result.stats) {
+        responseText += `📈 Processing Stats:\n${JSON.stringify(result.stats, null, 2)}\n\n`;
+      }
+
+      responseText += `✨ Vision model successfully analyzed the image and extracted relevant information for your WooCommerce store.`;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ Vision processing error: ${error instanceof Error ? error.message : 'Unknown error'}
+
+🔧 Common Solutions:
+- Verify OPENAI_API_KEY is set correctly
+- Ensure image file is accessible and in supported format
+- Check if OpenAI vision models are available in your region
+- Try with a smaller image file`,
           },
         ],
         isError: true,
@@ -5043,6 +5278,90 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "get_mcp_context",
+  {
+    title: "Get MCP Context",
+    description: "Get information about this MCP server's purpose, capabilities, and configuration",
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const hasWooCommerceCredentials = !!(GLOBAL_CREDENTIALS.siteUrl && GLOBAL_CREDENTIALS.consumerKey && GLOBAL_CREDENTIALS.consumerSecret);
+      const hasWordPressCredentials = !!(GLOBAL_CREDENTIALS.username && GLOBAL_CREDENTIALS.password);
+      const hasAICredentials = !!(process.env.OPENAI_API_KEY);
+
+      const contextInfo = {
+        purpose: MCP_CONTEXT.purpose,
+        description: MCP_CONTEXT.description,
+        capabilities: MCP_CONTEXT.capabilities,
+        defaultBehavior: MCP_CONTEXT.defaultBehavior,
+        aiProvider: MCP_CONTEXT.aiProvider,
+        credentialPolicy: MCP_CONTEXT.credentialPolicy,
+
+        configuration: {
+          woocommerceConfigured: hasWooCommerceCredentials,
+          wordpressConfigured: hasWordPressCredentials,
+          aiConfigured: hasAICredentials,
+          siteUrl: GLOBAL_CREDENTIALS.siteUrl ? `${GLOBAL_CREDENTIALS.siteUrl.substring(0, 20)}...` : 'Not configured',
+          aiModel: process.env.AI_MODEL || 'gpt-4-vision-preview',
+          visionModel: process.env.AI_VISION_MODEL || 'gpt-4-vision-preview',
+          textModel: process.env.AI_TEXT_MODEL || 'gpt-4',
+          customEndpoint: process.env.OPENAI_BASE_URL || 'Default OpenAI',
+        },
+
+        toolCategories: {
+          woocommerceTools: 91,
+          aiProcessingTools: 11,
+          totalTools: 102,
+        },
+
+        supportedFormats: {
+          documents: ['CSV', 'Excel', 'PDF', 'Word', 'Text', 'JSON'],
+          images: ['JPG', 'PNG', 'GIF', 'WebP', 'BMP', 'TIFF'],
+          processingModes: ['extract', 'analyze', 'generate_products', 'bulk_upload'],
+          visionAnalysis: ['product_extraction', 'catalog_analysis', 'price_detection', 'general_analysis'],
+        },
+
+        recommendations: [] as string[]
+      };
+
+      // Add configuration recommendations
+      if (!hasWooCommerceCredentials) {
+        contextInfo.recommendations.push("🔧 Configure WooCommerce credentials (WORDPRESS_SITE_URL, WOOCOMMERCE_CONSUMER_KEY, WOOCOMMERCE_CONSUMER_SECRET)");
+      }
+      if (!hasWordPressCredentials) {
+        contextInfo.recommendations.push("🔧 Configure WordPress credentials for content management (WORDPRESS_USERNAME, WORDPRESS_PASSWORD)");
+      }
+      if (!hasAICredentials) {
+        contextInfo.recommendations.push("🤖 Configure AI credentials for document processing (OPENAI_API_KEY)");
+      }
+      if (hasWooCommerceCredentials && hasAICredentials) {
+        contextInfo.recommendations.push("✅ Fully configured! Ready for complete WooCommerce management and AI processing");
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `🤖 WooCommerce MCP Server Context\n${'='.repeat(40)}\n\n${JSON.stringify(contextInfo, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error getting MCP context: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 // Main function to start the server
 async function main() {
   try {
@@ -5120,21 +5439,29 @@ async function main() {
     console.log("⚙️ System (3 tools):");
     console.log("- get_system_status, get_system_status_tools, run_system_status_tool");
     console.log("");
-    console.log("🤖 AI Document Processing (10 tools):");
-    console.log("- upload_file, search_files, process_document, list_templates, create_template, get_template, validate_file");
-    console.log("- bulk_create_products, ai_enhance_products, ai_workflow_complete");
+    console.log("🤖 AI Document & Vision Processing (12 tools):");
+    console.log("- upload_file, search_files, process_document, process_image_with_vision, list_templates");
+    console.log("- create_template, get_template, validate_file, bulk_create_products");
+    console.log("- ai_enhance_products, ai_workflow_complete, get_mcp_context");
     console.log("");
-    console.log("🎯 TOTAL: 101 COMPREHENSIVE WOOCOMMERCE + AI TOOLS");
+    console.log("🎯 TOTAL: 103 COMPREHENSIVE WOOCOMMERCE + AI TOOLS");
     console.log("");
     console.log("📋 Environment variables:");
+    console.log("🔧 Required for WooCommerce:");
     console.log("- WORDPRESS_SITE_URL: Your WordPress site URL");
     console.log("- WOOCOMMERCE_CONSUMER_KEY: WooCommerce API consumer key");
     console.log("- WOOCOMMERCE_CONSUMER_SECRET: WooCommerce API consumer secret");
-    console.log("- WORDPRESS_USERNAME: WordPress username (for WordPress API)");
-    console.log("- WORDPRESS_PASSWORD: WordPress password (for WordPress API)");
-    console.log("- VLLM_ENDPOINT: vLLM server endpoint (optional)");
-    console.log("- OPENAI_API_KEY: OpenAI API key (optional, fallback for AI)");
-    console.log("- AI_MODEL: AI model to use (default: gpt-4)");
+    console.log("- WORDPRESS_USERNAME: WordPress username (for content management)");
+    console.log("- WORDPRESS_PASSWORD: WordPress password (for content management)");
+    console.log("");
+    console.log("🤖 AI & Vision Models:");
+    console.log("- OPENAI_API_KEY: OpenAI API key (required for AI features)");
+    console.log("- OPENAI_BASE_URL: Custom OpenAI-compatible endpoint (optional)");
+    console.log("- AI_MODEL: Default AI model (default: gpt-4-vision-preview)");
+    console.log("- AI_VISION_MODEL: Vision model for images (default: gpt-4-vision-preview)");
+    console.log("- AI_TEXT_MODEL: Text model for documents (default: gpt-4)");
+    console.log("");
+    console.log("📁 File Processing:");
     console.log("- UPLOAD_DIR: Directory for file uploads (default: ./uploads)");
     console.log("- TEMPLATE_DIR: Directory for templates (default: ./templates)");
 

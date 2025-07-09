@@ -13,13 +13,16 @@ import { z } from 'zod';
 
 // Document processing schemas
 export const DocumentProcessingConfigSchema = z.object({
-  vllmEndpoint: z.string().url().optional(),
   openaiApiKey: z.string().optional(),
-  model: z.string().default('gpt-4'),
+  openaiBaseUrl: z.string().url().optional(), // Support for custom OpenAI-compatible endpoints
+  model: z.string().default('gpt-4-vision-preview'), // Default to vision model
+  visionModel: z.string().default('gpt-4-vision-preview'), // Specific vision model for image processing
+  textModel: z.string().default('gpt-4'), // Text-only model for non-vision tasks
   maxTokens: z.number().default(4000),
   temperature: z.number().min(0).max(2).default(0.7),
   uploadDir: z.string().default('./uploads'),
   templateDir: z.string().default('./templates'),
+  supportedImageFormats: z.array(z.string()).default(['jpg', 'jpeg', 'png', 'gif', 'webp']),
 });
 
 export const ProductTemplateSchema = z.object({
@@ -48,7 +51,7 @@ export const ProductTemplateSchema = z.object({
 
 export const DocumentProcessingRequestSchema = z.object({
   filePath: z.string(),
-  fileType: z.enum(['csv', 'xlsx', 'pdf', 'docx', 'txt', 'json']),
+  fileType: z.enum(['csv', 'xlsx', 'pdf', 'docx', 'txt', 'json', 'image']),
   processingMode: z.enum(['extract', 'analyze', 'generate_products', 'bulk_upload']),
   template: z.string().optional(),
   customPrompt: z.string().optional(),
@@ -73,54 +76,82 @@ export interface ProcessingResult {
 export class DocumentProcessor {
   private config: z.infer<typeof DocumentProcessingConfigSchema>;
   private openai?: OpenAI;
-  private vllmClient?: any;
 
   constructor(config: z.infer<typeof DocumentProcessingConfigSchema>) {
     this.config = DocumentProcessingConfigSchema.parse(config);
-    
-    // Initialize AI clients
-    if (this.config.openaiApiKey) {
-      this.openai = new OpenAI({
-        apiKey: this.config.openaiApiKey,
-      });
-    }
 
-    // Initialize vLLM client if endpoint provided
-    if (this.config.vllmEndpoint) {
-      this.initializeVLLMClient();
+    // Initialize OpenAI client with vision support
+    if (this.config.openaiApiKey) {
+      const clientConfig: any = {
+        apiKey: this.config.openaiApiKey,
+      };
+
+      // Support for custom OpenAI-compatible endpoints (like local models)
+      if (this.config.openaiBaseUrl) {
+        clientConfig.baseURL = this.config.openaiBaseUrl;
+      }
+
+      this.openai = new OpenAI(clientConfig);
     }
 
     // Ensure directories exist
     this.ensureDirectories();
   }
 
-  private initializeVLLMClient() {
-    // vLLM client initialization
-    this.vllmClient = {
-      endpoint: this.config.vllmEndpoint,
-      generateCompletion: async (prompt: string, options: any = {}) => {
-        const response = await fetch(`${this.config.vllmEndpoint}/v1/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: options.model || 'default',
-            prompt: prompt,
-            max_tokens: options.max_tokens || this.config.maxTokens,
-            temperature: options.temperature || this.config.temperature,
-            stop: options.stop || null,
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error(`vLLM API error: ${response.statusText}`);
+  // Check if a file is an image that can be processed with vision models
+  private isImageFile(filePath: string): boolean {
+    const extension = path.extname(filePath).toLowerCase().replace('.', '');
+    return this.config.supportedImageFormats.includes(extension);
+  }
+
+  // Convert image to base64 for vision model processing
+  private async imageToBase64(filePath: string): Promise<string> {
+    try {
+      const imageBuffer = fs.readFileSync(filePath);
+      const base64 = imageBuffer.toString('base64');
+      const mimeType = mime.lookup(filePath) || 'image/jpeg';
+      return `data:${mimeType};base64,${base64}`;
+    } catch (error) {
+      throw new Error(`Failed to convert image to base64: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Process images using vision models
+  private async processImageWithVision(filePath: string, customPrompt?: string): Promise<string> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not configured. Please set OPENAI_API_KEY environment variable.');
+    }
+
+    const base64Image = await this.imageToBase64(filePath);
+    const prompt = customPrompt || `
+      Analyze this image and extract any product information you can find.
+      Look for:
+      - Product names and titles
+      - Prices and pricing information
+      - Product descriptions and features
+      - Categories and classifications
+      - SKUs or product codes
+      - Any other relevant product data
+
+      Format the response as structured data that can be used to create WooCommerce products.
+    `;
+
+    const response = await this.openai.chat.completions.create({
+      model: this.config.visionModel,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: base64Image } }
+          ]
         }
-        
-        const data = await response.json();
-        return data.choices[0]?.text || '';
-      }
-    };
+      ],
+      max_tokens: this.config.maxTokens,
+      temperature: this.config.temperature,
+    });
+
+    return response.choices[0]?.message?.content || '';
   }
 
   private ensureDirectories() {
@@ -143,32 +174,41 @@ export class DocumentProcessor {
         };
       }
 
-      // Process based on file type
+      // Check if it's an image file and use vision processing
       let extractedData: any;
-      switch (validatedRequest.fileType) {
-        case 'csv':
-          extractedData = await this.processCSV(validatedRequest.filePath);
-          break;
-        case 'xlsx':
-          extractedData = await this.processExcel(validatedRequest.filePath);
-          break;
-        case 'pdf':
-          extractedData = await this.processPDF(validatedRequest.filePath);
-          break;
-        case 'docx':
-          extractedData = await this.processDocx(validatedRequest.filePath);
-          break;
-        case 'txt':
-          extractedData = await this.processText(validatedRequest.filePath);
-          break;
-        case 'json':
-          extractedData = await this.processJSON(validatedRequest.filePath);
-          break;
-        default:
-          return {
-            success: false,
-            message: `Unsupported file type: ${validatedRequest.fileType}`,
-          };
+      if (this.isImageFile(validatedRequest.filePath)) {
+        // Use vision model for image processing
+        extractedData = await this.processImageWithVision(
+          validatedRequest.filePath,
+          validatedRequest.customPrompt
+        );
+      } else {
+        // Process based on file type for non-image files
+        switch (validatedRequest.fileType) {
+          case 'csv':
+            extractedData = await this.processCSV(validatedRequest.filePath);
+            break;
+          case 'xlsx':
+            extractedData = await this.processExcel(validatedRequest.filePath);
+            break;
+          case 'pdf':
+            extractedData = await this.processPDF(validatedRequest.filePath);
+            break;
+          case 'docx':
+            extractedData = await this.processDocx(validatedRequest.filePath);
+            break;
+          case 'txt':
+            extractedData = await this.processText(validatedRequest.filePath);
+            break;
+          case 'json':
+            extractedData = await this.processJSON(validatedRequest.filePath);
+            break;
+          default:
+            return {
+              success: false,
+              message: `Unsupported file type: ${validatedRequest.fileType}`,
+            };
+        }
       }
 
       // Process based on mode
@@ -393,29 +433,56 @@ export class DocumentProcessor {
     };
   }
 
-  private async generateAIResponse(prompt: string): Promise<string> {
-    // Try vLLM first if available
-    if (this.vllmClient) {
-      try {
-        return await this.vllmClient.generateCompletion(prompt);
-      } catch (error) {
-        console.warn('vLLM failed, falling back to OpenAI:', error);
+  private async generateAIResponse(prompt: string, useVision: boolean = false, imagePath?: string): Promise<string> {
+    if (!this.openai) {
+      throw new Error(`🤖 AI service not configured.
+
+📋 MCP Context: I'm an AI-powered WooCommerce management system that needs OpenAI API access for intelligent document processing.
+
+🔧 Configuration Required:
+1. Set OPENAI_API_KEY=sk-your-key in environment variables
+2. Optionally set OPENAI_BASE_URL for custom endpoints (like local models)
+
+🎯 My AI Capabilities:
+- Document analysis and product generation
+- Vision model support for image processing
+- SEO optimization and content enhancement
+- Multi-format document parsing
+
+Current request: ${useVision ? 'Vision model processing' : 'Text model processing'}`);
+    }
+
+    try {
+      if (useVision && imagePath) {
+        // Use vision model for image processing
+        return await this.processImageWithVision(imagePath, prompt);
+      } else {
+        // Use text model for regular processing
+        const response = await this.openai.chat.completions.create({
+          model: this.config.textModel,
+          messages: [
+            {
+              role: 'system',
+              content: `You are an intelligent WooCommerce product management assistant. Your purpose is to help users manage their e-commerce store and create products from various document formats.
+
+Context: ${prompt.includes('WooCommerce') ? 'WooCommerce product processing' : 'Document analysis for e-commerce'}
+
+Always provide structured, actionable responses that can be used for WooCommerce product creation.`
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: this.config.maxTokens,
+          temperature: this.config.temperature,
+        });
+
+        return response.choices[0]?.message?.content || '';
       }
+    } catch (error) {
+      throw new Error(`AI processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    // Fallback to OpenAI
-    if (this.openai) {
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: this.config.maxTokens,
-        temperature: this.config.temperature,
-      });
-
-      return response.choices[0]?.message?.content || '';
-    }
-
-    throw new Error('No AI service available. Configure either vLLM endpoint or OpenAI API key.');
   }
 
   private parseProductsFromResponse(response: string): any[] {

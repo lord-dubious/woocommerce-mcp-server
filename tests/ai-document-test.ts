@@ -12,13 +12,16 @@ async function testAIDocumentProcessing() {
 
   // Initialize components
   const documentProcessor = new DocumentProcessor({
-    vllmEndpoint: process.env.VLLM_ENDPOINT,
     openaiApiKey: process.env.OPENAI_API_KEY,
-    model: 'gpt-4',
+    openaiBaseUrl: process.env.OPENAI_BASE_URL,
+    model: 'gpt-4-vision-preview',
+    visionModel: 'gpt-4-vision-preview',
+    textModel: 'gpt-4',
     maxTokens: 4000,
     temperature: 0.7,
     uploadDir: './uploads',
     templateDir: './templates',
+    supportedImageFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
   });
 
   const templateManager = new TemplateManager('./templates');
@@ -232,9 +235,10 @@ async function testAIDocumentProcessing() {
   }
   
   console.log('\n🔧 To enable full AI functionality:');
-  console.log('   - Set VLLM_ENDPOINT for vLLM integration');
-  console.log('   - Set OPENAI_API_KEY for OpenAI fallback');
-  console.log('   - Ensure AI services are running and accessible');
+  console.log('   - Set OPENAI_API_KEY for AI document processing');
+  console.log('   - Optionally set OPENAI_BASE_URL for custom endpoints');
+  console.log('   - Configure AI_VISION_MODEL for image processing');
+  console.log('   - Ensure OpenAI API access is available');
   
   return testsPassed === testsTotal;
 }

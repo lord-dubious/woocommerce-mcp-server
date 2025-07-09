@@ -147,10 +147,11 @@ This server has been completely rewritten to properly implement the MCP standard
 - `get_system_status_tools` - Get available system status tools
 - `run_system_status_tool` - Execute system status tools
 
-### 🤖 AI Document Processing
+### 🤖 AI Document & Vision Processing
 - `upload_file` - Upload files for processing
 - `search_files` - Search and filter files in directories
-- `process_document` - AI-powered document processing (CSV, Excel, PDF, etc.)
+- `process_document` - AI-powered document processing (CSV, Excel, PDF, images, etc.)
+- `process_image_with_vision` - Analyze images using AI vision models
 - `list_templates` - List available product templates
 - `create_template` - Create custom product templates
 - `get_template` - Retrieve specific templates
@@ -158,6 +159,7 @@ This server has been completely rewritten to properly implement the MCP standard
 - `bulk_create_products` - Enterprise-grade bulk product creation
 - `ai_enhance_products` - AI-powered product enhancement and SEO
 - `ai_workflow_complete` - End-to-end automated workflows
+- `get_mcp_context` - Get MCP server context and configuration
 
 ## Installation
 
@@ -195,15 +197,17 @@ WORDPRESS_PASSWORD=your_password
 # Set to "true" for development, leave unset for MCP clients
 WOOCOMMERCE_MCP_VERBOSE=true
 
-# AI Document Processing (Optional)
-VLLM_ENDPOINT=http://localhost:8000  # vLLM server endpoint
-OPENAI_API_KEY=sk-your-openai-key    # OpenAI API key (fallback)
-AI_MODEL=gpt-4                       # AI model to use
-AI_MAX_TOKENS=4000                   # Maximum tokens for AI responses
-AI_TEMPERATURE=0.7                   # AI temperature (0-2)
-UPLOAD_DIR=./uploads                 # File upload directory
-TEMPLATE_DIR=./templates             # Template directory
-MAX_FILE_SIZE=52428800              # Max file size (50MB)
+# AI Document & Vision Processing (Optional but Recommended)
+OPENAI_API_KEY=sk-your-openai-key           # OpenAI API key (required for AI features)
+OPENAI_BASE_URL=https://api.openai.com/v1   # Custom OpenAI-compatible endpoint (optional)
+AI_MODEL=gpt-4-vision-preview               # Default AI model with vision support
+AI_VISION_MODEL=gpt-4-vision-preview        # Vision model for image processing
+AI_TEXT_MODEL=gpt-4                         # Text model for document processing
+AI_MAX_TOKENS=4000                          # Maximum tokens for AI responses
+AI_TEMPERATURE=0.7                          # AI creativity (0-2)
+UPLOAD_DIR=./uploads                        # File upload directory
+TEMPLATE_DIR=./templates                    # Template directory
+MAX_FILE_SIZE=52428800                      # Max file size (50MB)
 ```
 
 ### Getting WooCommerce API Keys
@@ -468,7 +472,7 @@ TEST_WOOCOMMERCE_CONSUMER_SECRET=cs_your_test_secret
 **⚠️ Important**: Always use a test/staging site, never your production store!
 
 #### What Gets Tested
-- ✅ All 101 WooCommerce + AI tools
+- ✅ All 103 WooCommerce + AI tools
 - ✅ Schema validation for all data types
 - ✅ Error handling and edge cases
 - ✅ API connectivity and authentication
