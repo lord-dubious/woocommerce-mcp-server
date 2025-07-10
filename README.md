@@ -223,8 +223,9 @@ MAX_FILE_SIZE=52428800                      # Max file size (50MB)
 ### **Intelligent Product Creation**
 Transform any document into WooCommerce products using AI:
 
-- **📄 Multi-Format Support**: CSV, Excel, PDF, Word, TXT, JSON
-- **🧠 AI-Powered Analysis**: vLLM + OpenAI integration
+- **📄 Multi-Format Support**: CSV, Excel, PDF, Word, TXT, JSON, Images
+- **🧠 AI-Powered Analysis**: LangChain + Vision Language Models
+- **👁️ Vision Model Integration**: OpenAI-compatible vision models with client detection
 - **📋 Smart Templates**: Pre-built and custom templates
 - **🔍 File Search & Management**: Advanced file operations
 - **✅ Validation & Quality Control**: Comprehensive validation
