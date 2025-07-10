@@ -147,6 +147,20 @@ This server has been completely rewritten to properly implement the MCP standard
 - `get_system_status_tools` - Get available system status tools
 - `run_system_status_tool` - Execute system status tools
 
+### 🤖 AI Document & Vision Processing
+- `upload_file` - Upload files for processing
+- `search_files` - Search and filter files in directories
+- `process_document` - AI-powered document processing (CSV, Excel, PDF, images, etc.)
+- `process_image_with_vision` - Analyze images using AI vision models
+- `list_templates` - List available product templates
+- `create_template` - Create custom product templates
+- `get_template` - Retrieve specific templates
+- `validate_file` - Validate files before processing
+- `bulk_create_products` - Enterprise-grade bulk product creation
+- `ai_enhance_products` - AI-powered product enhancement and SEO
+- `ai_workflow_complete` - End-to-end automated workflows
+- `get_mcp_context` - Get MCP server context and configuration
+
 ## Installation
 
 1. Clone the repository:
@@ -178,6 +192,22 @@ WOOCOMMERCE_CONSUMER_SECRET=cs_your_consumer_secret
 # Optional for WordPress API (if needed)
 WORDPRESS_USERNAME=your_username
 WORDPRESS_PASSWORD=your_password
+
+# Optional: Enable verbose logging (shows all 98 tools on startup)
+# Set to "true" for development, leave unset for MCP clients
+WOOCOMMERCE_MCP_VERBOSE=true
+
+# AI Document & Vision Processing (Optional but Recommended)
+OPENAI_API_KEY=sk-your-openai-key           # OpenAI API key (required for AI features)
+OPENAI_BASE_URL=https://api.openai.com/v1   # Custom OpenAI-compatible endpoint (optional)
+AI_MODEL=gpt-4-vision-preview               # Default AI model with vision support
+AI_VISION_MODEL=gpt-4-vision-preview        # Vision model for image processing
+AI_TEXT_MODEL=gpt-4                         # Text model for document processing
+AI_MAX_TOKENS=4000                          # Maximum tokens for AI responses
+AI_TEMPERATURE=0.7                          # AI creativity (0-2)
+UPLOAD_DIR=./uploads                        # File upload directory
+TEMPLATE_DIR=./templates                    # Template directory
+MAX_FILE_SIZE=52428800                      # Max file size (50MB)
 ```
 
 ### Getting WooCommerce API Keys
@@ -187,6 +217,81 @@ WORDPRESS_PASSWORD=your_password
 3. Click **Add Key**
 4. Set permissions to **Read/Write**
 5. Copy the Consumer Key and Consumer Secret
+
+## 🤖 AI Document Processing Features
+
+### **Intelligent Product Creation**
+Transform any document into WooCommerce products using AI:
+
+- **📄 Multi-Format Support**: CSV, Excel, PDF, Word, TXT, JSON, Images
+- **🧠 AI-Powered Analysis**: LangChain + Vision Language Models
+- **👁️ Vision Model Integration**: OpenAI-compatible vision models with client detection
+- **📋 Smart Templates**: Pre-built and custom templates
+- **🔍 File Search & Management**: Advanced file operations
+- **✅ Validation & Quality Control**: Comprehensive validation
+
+### **Supported Document Types**
+- **CSV/Excel**: Product catalogs, inventory lists, price sheets
+- **PDF**: Product brochures, catalogs, specification sheets
+- **Word Documents**: Product descriptions, marketing materials
+- **Text Files**: Simple product lists, descriptions
+- **JSON**: Structured product data, API exports
+
+### **AI Processing Modes**
+1. **Extract**: Extract raw data from documents
+2. **Analyze**: AI analysis of document content and structure
+3. **Generate Products**: Convert data to WooCommerce products
+4. **Bulk Upload**: Process and upload products in batches
+
+### **Template System**
+- **Basic Product**: Simple CSV imports
+- **E-commerce CSV**: Standard e-commerce exports
+- **Inventory Management**: Inventory system integration
+- **Digital Products**: Downloads and digital goods
+- **Custom Templates**: Create your own mapping rules
+
+### **Example AI Workflows**
+
+#### **CSV Product Import**
+```bash
+# 1. Upload your CSV file
+upload_file("/path/to/products.csv")
+
+# 2. Process with AI using a template
+process_document({
+  "filePath": "/path/to/products.csv",
+  "fileType": "csv",
+  "processingMode": "generate_products",
+  "template": "ecommerce-csv",
+  "batchSize": 10
+})
+
+# 3. Bulk upload to WooCommerce
+process_document({
+  "filePath": "/path/to/products.csv",
+  "fileType": "csv",
+  "processingMode": "bulk_upload",
+  "template": "ecommerce-csv"
+})
+```
+
+#### **PDF Catalog Processing**
+```bash
+# 1. Extract text from PDF catalog
+process_document({
+  "filePath": "/path/to/catalog.pdf",
+  "fileType": "pdf",
+  "processingMode": "extract"
+})
+
+# 2. AI analysis and product generation
+process_document({
+  "filePath": "/path/to/catalog.pdf",
+  "fileType": "pdf",
+  "processingMode": "generate_products",
+  "customPrompt": "Extract product information from this catalog including names, prices, and descriptions"
+})
+```
 
 ## Usage
 
@@ -368,7 +473,7 @@ TEST_WOOCOMMERCE_CONSUMER_SECRET=cs_your_test_secret
 **⚠️ Important**: Always use a test/staging site, never your production store!
 
 #### What Gets Tested
-- ✅ All 91 WooCommerce tools
+- ✅ All 103 WooCommerce + AI tools
 - ✅ Schema validation for all data types
 - ✅ Error handling and edge cases
 - ✅ API connectivity and authentication
